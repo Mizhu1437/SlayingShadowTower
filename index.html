@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>東方戮影塔 〜 Formless Barrage</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #05060c;
+      color: #e6edf3;
+      font: 13px/1.6 "Consolas", "Menlo", monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+      min-height: 100vh;
+      padding: 8px 0 10px;
+      overflow: hidden;
+      user-select: none;
+    }
+    #stage { position: relative; flex-shrink: 0; }
+    #stage canvas { display: block; }
+
+    .panel {
+      position: fixed;
+      background: rgba(8, 10, 20, 0.86);
+      border: 1px solid #2a3350;
+      border-radius: 6px;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+    }
+
+    #hud {
+      top: 14px;
+      left: 14px;
+      padding: 10px 14px;
+      min-width: 168px;
+    }
+    .row { display: flex; justify-content: space-between; gap: 14px; }
+    .k { color: #7d8aa8; }
+    .v { color: #9fe3ff; font-weight: bold; }
+
+    #help {
+      bottom: 14px;
+      left: 14px;
+      padding: 9px 13px;
+      color: #7d8aa8;
+      font-size: 11px;
+      line-height: 1.9;
+    }
+    kbd {
+      background: #1a2135;
+      border: 1px solid #2f3b5c;
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: #9fe3ff;
+      font-size: 11px;
+    }
+
+    #title {
+      position: fixed;
+      top: 14px;
+      right: 16px;
+      color: #2f3b5c;
+      font-size: 11px;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    /* ---------- 续关 / 结算 覆盖层 ---------- */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 4, 9, 0.82);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(3px);
+      z-index: 10;
+    }
+    #overlay.hidden { display: none; }
+
+    #overlay-box {
+      background: rgba(10, 13, 24, 0.96);
+      border: 1px solid #3a4a70;
+      border-radius: 10px;
+      padding: 26px 36px;
+      min-width: 290px;
+      text-align: center;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    }
+    #overlay-title {
+      font-size: 19px;
+      color: #ff8fa3;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+    }
+    #overlay-stats {
+      color: #9fb0d0;
+      font-size: 12px;
+      line-height: 1.9;
+      margin-bottom: 20px;
+    }
+    #overlay-stats b { color: #9fe3ff; }
+    .btn-row { display: flex; gap: 12px; justify-content: center; }
+    .btn {
+      background: #1a2135;
+      border: 1px solid #3a4a70;
+      color: #cfe4ff;
+      border-radius: 5px;
+      padding: 8px 22px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .btn:hover {
+      background: #24304e;
+      border-color: #5a76b0;
+    }
+    .btn.primary {
+      background: #2a3f66;
+      border-color: #4a6ba8;
+    }
+    .btn.primary:hover { background: #35507f; }
+    .btn-hint {
+      margin-top: 14px;
+      color: #55648a;
+      font-size: 10.5px;
+    }
+
+    /* ---------- 手牌区 ---------- */
+    #hand-area {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .energy-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .energy-pips { display: flex; gap: 5px; }
+    .pip {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: #1a2135;
+      border: 1px solid #3a4a70;
+      transition: background 0.12s, box-shadow 0.12s;
+    }
+    .pip.on {
+      background: #6fd3ff;
+      box-shadow: 0 0 8px rgba(111, 211, 255, 0.7);
+      border-color: #9fe3ff;
+    }
+    .energy-bar {
+      flex: 1;
+      height: 3px;
+      background: #1a2135;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .energy-bar::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0;
+    }
+    .energy-bar { --w: 0; }
+    .energy-bar {
+      background-image: linear-gradient(#6fd3ff, #6fd3ff);
+      background-repeat: no-repeat;
+      background-size: var(--w) 100%;
+      transition: background-size 0.1s linear;
+    }
+    .energy-bar.full { background: #35507f; }
+
+    .hand-root {
+      display: flex;
+      gap: 7px;
+      justify-content: center;
+      align-items: flex-end;
+      min-height: 78px;
+    }
+
+    .card {
+      width: 82px;
+      height: 76px;
+      background: linear-gradient(160deg, #141a2b, #0e1320);
+      border: 1px solid #2f3b5c;
+      border-radius: 6px;
+      padding: 5px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      position: relative;
+      transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+      flex-shrink: 0;
+    }
+    .card.selected {
+      border-color: #6fd3ff;
+      transform: translateY(-9px);
+      box-shadow: 0 0 14px rgba(111, 211, 255, 0.45);
+    }
+    .card.passive { border-color: #4a3a6b; }
+
+    .card-cost {
+      position: absolute;
+      top: -6px; left: -6px;
+      width: 19px; height: 19px;
+      border-radius: 50%;
+      background: #2a3f66;
+      border: 1px solid #6fd3ff;
+      color: #9fe3ff;
+      font-size: 11px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-name {
+      font-size: 10.5px;
+      color: #cfe4ff;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+    .card-text {
+      font-size: 9px;
+      color: #7d8aa8;
+      line-height: 1.35;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .hand-info {
+      font-size: 10px;
+      color: #55648a;
+      height: 14px;
+      letter-spacing: 0.3px;
+    }
+    .hand-info.overload { color: #ff8fa3; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="title">東方戮影塔 〜 Formless Barrage</div>
+
+  <!-- 手牌与能量（DOM 实现，位于场地下方） -->
+  <div id="hand-area"></div>
+
+  <div id="hud" class="panel">
+    <div class="row"><span class="k">残机</span><span class="v" id="lives">3</span></div>
+    <div class="row"><span class="k">符卡</span><span class="v" id="spell">3</span></div>
+    <div class="row"><span class="k">击破</span><span class="v" id="kills">0</span></div>
+    <div class="row"><span class="k">得分</span><span class="v" id="score">0</span></div>
+    <div class="row"><span class="k">蜃銭</span><span class="v" id="coins">0</span></div>
+    <div class="row"><span class="k">波次</span><span class="v" id="wave">—</span></div>
+    <div class="row"><span class="k">FPS</span><span class="v" id="fps">—</span></div>
+  </div>
+
+  <div id="help" class="panel">
+    <div><kbd>方向键</kbd>/<kbd>WASD</kbd> 移动　<kbd>Shift</kbd> 低速</div>
+    <div><kbd>X</kbd> 释放符卡（中弹后有短暂决死窗口）</div>
+    <div><kbd>C</kbd> 切换选中的卡　<kbd>Z</kbd> 打出　<kbd>X</kbd> 释放符卡</div>
+    <div style="color:#ff8fa3;margin-top:4px">※ 本作没有自动射击 —— 所有输出只能靠卡牌</div>
+  </div>
+
+  <div id="overlay" class="hidden">
+    <div id="overlay-box">
+      <div id="overlay-title">残机耗尽</div>
+      <div id="overlay-stats"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-continue" data-action="continue">续关</button>
+        <button class="btn" id="btn-giveup" data-action="giveup">放弃</button>
+      </div>
+      <div class="btn-hint"><kbd>Enter</kbd> 续关　<kbd>Esc</kbd> 放弃</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

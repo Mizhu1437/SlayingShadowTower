@@ -1,0 +1,4 @@
+# 忽略本项目的 TS 之外的内容
+node_modules
+dist
+coverage

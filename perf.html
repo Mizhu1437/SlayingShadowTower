@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P0 弹幕性能验证 · 東方戮影塔</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #05060c;
+      color: #e6edf3;
+      font: 13px/1.6 "Consolas", "Menlo", monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #stage { position: relative; }
+    #stage canvas { display: block; image-rendering: pixelated; }
+
+    #hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: rgba(8, 10, 20, 0.82);
+      border: 1px solid #2a3350;
+      border-radius: 6px;
+      padding: 10px 14px;
+      min-width: 230px;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+    #hud.hidden { display: none; }
+
+    .row { display: flex; justify-content: space-between; gap: 16px; }
+    .k { color: #7d8aa8; }
+    .v { color: #9fe3ff; font-weight: bold; }
+    .v.good { color: #7ee787; }
+    .v.warn { color: #ffd166; }
+    .v.bad { color: #ff7b72; }
+
+    #bench {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #2a3350;
+      color: #8b98b8;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    #help {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(8, 10, 20, 0.82);
+      border: 1px solid #2a3350;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #7d8aa8;
+      font-size: 11px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+    kbd {
+      background: #1a2135;
+      border: 1px solid #2f3b5c;
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: #9fe3ff;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div class="row"><span class="k">FPS</span><span class="v good" id="fps">—</span></div>
+    <div class="row"><span class="k">敌弹数</span><span class="v" id="bullets">—</span></div>
+    <div class="row"><span class="k">逻辑耗时</span><span class="v" id="logic">—</span></div>
+    <div class="row"><span class="k">碰撞耗时</span><span class="v" id="grid">—</span></div>
+    <div class="row"><span class="k">本帧消弹</span><span class="v" id="hits">—</span></div>
+    <div class="row"><span class="k">碰撞模式</span><span class="v" id="mode">—</span></div>
+    <div id="bench">按 <kbd>B</kbd> 跑纯逻辑基准</div>
+  </div>
+
+  <div id="help">
+    <div><kbd>鼠标</kbd> 移动自机</div>
+    <div><kbd>1</kbd>–<kbd>5</kbd> 切换子弹数 500 / 1000 / 2000 / 3000 / 4000</div>
+    <div><kbd>G</kbd> 切换碰撞算法（对比用）</div>
+    <div><kbd>E</kbd> 切换真实消弹（默认关，保证压测量级恒定）</div>
+    <div><kbd>B</kbd> 纯逻辑基准测试</div>
+    <div><kbd>R</kbd> 重置统计　<kbd>H</kbd> 隐藏面板</div>
+  </div>
+
+  <script type="module" src="/src/perf-main.ts"></script>
+</body>
+</html>

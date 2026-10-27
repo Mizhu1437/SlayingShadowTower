@@ -1,0 +1,27 @@
+{
+  "name": "slaying-shadow-tower",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "東方戮影塔 〜 Formless Barrage — 东方 Project 同人弹幕 STG + 卡牌构筑",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "tsx tests/bench/index.ts"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "playwright": "^1.64.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}

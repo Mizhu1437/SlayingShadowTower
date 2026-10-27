@@ -1,0 +1,46 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建产物
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+
+# 测试与覆盖率
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# 缓存
+.vite/
+.turbo/
+.eslintcache
+
+# Tauri 打包产物
+src-tauri/target/
+
+# 编辑器与 IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 环境变量（绝不提交凭据）
+.env
+.env.local
+.env.*.local
