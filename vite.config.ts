@@ -14,6 +14,11 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // 生产构建不输出 sourcemap。
+    //
+    // 原因：开启后会在 dist/ 里生成体积约为 JS 五倍的 .map 文件，
+    // 部署到 GitHub Pages 后任何人都能下载并还原出完整源码。
+    // 开发时需要源码映射，但那时用的是 Vite dev server，不依赖这个开关。
+    sourcemap: false,
   },
 });
