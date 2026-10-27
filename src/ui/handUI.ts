@@ -78,13 +78,19 @@ export class HandUI {
     this.energyBarEl.classList.toggle('full', e.full);
 
     // 状态提示
+    //
+    // 时间必须显示"还剩多少"，而不是"已经过了多少"：
+    //   progress 是已积累的比例（0→1），剩余时间 = (1 - progress) × 间隔。
+    //   早先写成 progress × 常数，既是从 0 往上涨（像正计时），
+    //   又把间隔硬编码成 3 秒，导致 T 改成 5 后显示仍是 3。
     let info = '';
     if (deck.paused) {
       info = `过载 · 抽牌停顿 ${deck.pauseLeft.toFixed(1)}s`;
     } else if (e.full) {
       info = '能量已满';
     } else {
-      info = `下一点能量 ${(deck.energy.progress * 3).toFixed(1)}s`;
+      const remain = (1 - e.progress) * e.interval;
+      info = `下一点能量 ${remain.toFixed(1)}s`;
     }
     const deckInfo =
       `牌堆 ${deck.pile.drawCount} · 弃牌 ${deck.pile.discardCount}`;
