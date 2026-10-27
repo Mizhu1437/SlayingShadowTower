@@ -1,0 +1,60 @@
+name: Deploy to GitHub Pages
+
+# 开发阶段：推到 main 就自动构建并发布，方便随时用手机或别的设备试玩。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # 也支持在 Actions 页面手动触发
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署；新的推送会取消排队中的旧任务，但不打断正在发布的。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查与单元测试
+        run: |
+          pnpm run typecheck
+          pnpm run test
+
+      # 用带子路径前缀的配置构建，否则 Pages 上资源会 404 白屏。
+      - name: 构建（GitHub Pages 子路径）
+        run: pnpm run build:pages
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
