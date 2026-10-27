@@ -10,8 +10,14 @@ describe('牌堆不会枯竭（回归测试）', () => {
     expect(deck.length).toBeGreaterThan(6);
   });
 
-  it('初始卡组至少 10 张', () => {
-    expect(createStarterDeck().length).toBeGreaterThanOrEqual(10);
+  it('初始卡组符合用户设计：4 符击 + 3 防御 + 1 凤翼天翔 = 8 张', () => {
+    const deck = createStarterDeck();
+    expect(deck.length).toBe(8);
+
+    const names = deck.map((c) => c.name);
+    expect(names.filter((n) => n === '符击').length).toBe(4);
+    expect(names.filter((n) => n === '防御').length).toBe(3);
+    expect(names.filter((n) => n.includes('火鸟')).length).toBe(1);
   });
 
   it('初始卡组里必须有保命卡（清弹或无敌）', () => {

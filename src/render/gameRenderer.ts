@@ -15,6 +15,9 @@ const COLORS = {
   shot: 0x9fe3ff,
   shotOrb: 0xffd98a,
   shotTalisman: 0xc79bff,
+  fireCore: 0xfff2b0,
+  fireMid: 0xffa63d,
+  fireEdge: 0xff4d2e,
   enemy: 0xff6b8a,
   enemyFlash: 0xffffff,
   player: 0xff5f7e,
@@ -35,6 +38,9 @@ export class GameRenderer {
   private readonly shotNeedleGfx: Graphics[] = [];
   private readonly shotOrbGfx: Graphics[] = [];
   private readonly shotTalismanGfx: Graphics[] = [];
+  /** 火鸟：每枚由多个 Graphics 组成的容器 */
+  private readonly firebirdGfx: Container[] = [];
+  private readonly FIREBIRD_CAP = 32;
 
   private enemyGfx: Graphics[] = [];
   private readonly bulletGfx: Graphics[] = [];
@@ -115,6 +121,59 @@ export class GameRenderer {
       g.visible = false;
       this.shotTalismanGfx.push(g);
       this.shotLayer.addChild(g);
+    }
+
+    // 火鸟：用图形拼成「由炎弹聚成的鸟」
+    //
+    // 形态说明（从这张参考图只能确认"密集橙色光点聚成一团"，
+    // 具体轮廓由这里定义）：中央一个亮核，两侧各三片渐小的翼羽，
+    // 后方拖一条逐渐变暗的尾焰。
+    for (let i = 0; i < this.FIREBIRD_CAP; i++) {
+      const c = new Container();
+
+      // 尾焰（最暗，在最后面）
+      for (let t = 0; t < 3; t++) {
+        const tail = new Graphics()
+          .ellipse(0, 12 + t * 9, 7 - t * 1.6, 12 - t * 2.5)
+          .fill({ color: COLORS.fireEdge, alpha: 0.42 - t * 0.11 });
+        c.addChild(tail);
+      }
+
+      // 双翼：左右各三片，逐渐变小、变暗
+      for (let w = 0; w < 3; w++) {
+        const len = 26 - w * 7;
+        const wid = 9 - w * 2;
+        const alpha = 0.75 - w * 0.18;
+        const dy = 2 + w * 4;
+
+        const right = new Graphics()
+          .poly([0, 0, len, dy - wid, len * 0.75, dy + wid, 0, wid * 0.6])
+          .fill({ color: w === 0 ? COLORS.fireMid : COLORS.fireEdge, alpha });
+        right.position.set(3, dy);
+        c.addChild(right);
+
+        const left = new Graphics()
+          .poly([0, 0, -len, dy - wid, -len * 0.75, dy + wid, 0, wid * 0.6])
+          .fill({ color: w === 0 ? COLORS.fireMid : COLORS.fireEdge, alpha });
+        left.position.set(-3, dy);
+        c.addChild(left);
+      }
+
+      // 外焰
+      const glow = new Graphics()
+        .circle(0, 0, 15)
+        .fill({ color: COLORS.fireEdge, alpha: 0.55 });
+      c.addChild(glow);
+
+      // 亮核
+      const core = new Graphics()
+        .circle(0, 0, 7)
+        .fill({ color: COLORS.fireCore, alpha: 0.95 });
+      c.addChild(core);
+
+      c.visible = false;
+      this.firebirdGfx.push(c);
+      this.shotLayer.addChild(c);
     }
   }
 
@@ -290,12 +349,13 @@ export class GameRenderer {
   }
 
   private renderShots(world: World): void {
-    const s = world.playerShots;
+    const s = world.cardShots.shots;
     const f = s.field;
 
     let nNeedle = 0;
     let nOrb = 0;
     let nTalisman = 0;
+    let nFirebird = 0;
 
     const limit = f.scanLimit;
     for (let i = 0; i < limit; i++) {
@@ -310,6 +370,16 @@ export class GameRenderer {
         if (!g) continue;
         g.visible = true;
         g.position.set(x, y);
+      } else if (kind === PlayerShots.KIND_FIREBIRD) {
+        const c = this.firebirdGfx[nFirebird++];
+        if (!c) continue;
+        c.visible = true;
+        c.position.set(x, y);
+        // 火鸟朝飞行方向（默认向上），带一点呼吸式脉动
+        c.rotation = Math.atan2(f.vy[i]!, f.vx[i]!) + Math.PI / 2;
+        const pulse = 1 + 0.09 * Math.sin(performance.now() / 70 + i);
+        c.scale.set(pulse);
+        c.alpha = 0.92 + 0.08 * Math.sin(performance.now() / 45 + i * 2);
       } else if (kind === PlayerShots.KIND_TALISMAN) {
         const g = this.shotTalismanGfx[nTalisman++];
         if (!g) continue;
@@ -333,6 +403,9 @@ export class GameRenderer {
     }
     for (let i = nTalisman; i < this.shotTalismanGfx.length; i++) {
       this.shotTalismanGfx[i]!.visible = false;
+    }
+    for (let i = nFirebird; i < this.firebirdGfx.length; i++) {
+      this.firebirdGfx[i]!.visible = false;
     }
   }
 

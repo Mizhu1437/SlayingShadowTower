@@ -12,11 +12,11 @@ const DUMMY = { hp: 12, radius: 11, score: 100, coin: 5 };
 describe('World 无自动射击（设计变更）', () => {
   it('静止不动不会发射任何子弹', () => {
     const w = new World({ seed: 1 });
-    expect(w.playerShots.aliveCount).toBe(0);
+    expect(w.cardShots.shots.aliveCount).toBe(0);
 
     // 跑 5 秒（300 帧），不应该有任何自机子弹
     stepN(w, 300);
-    expect(w.playerShots.aliveCount).toBe(0);
+    expect(w.cardShots.shots.aliveCount).toBe(0);
   });
 
   it('没有卡牌输出时，敌人不会被自动打死', () => {
@@ -36,10 +36,11 @@ describe('World 用卡牌击破敌人', () => {
    * 自动射击已移除，输出只能靠卡牌。
    */
   function playDamageCard(w: World): boolean {
-    // 选中一张有 damage_all 效果的卡
+    // 选中一张能造成伤害的卡（符击 / 凤翼天翔）
     const hand = w.deck.pile.hand;
     const idx = hand.findIndex((c) =>
-      c.effects?.some((e) => e.op === 'damage_all'),
+      c.effects?.some((e) =>
+        e.op === 'burst_fire' || e.op === 'pierce_shot' || e.op === 'damage_all'),
     );
     if (idx < 0) return false;
     w.deck.selected = idx;
@@ -48,16 +49,29 @@ describe('World 用卡牌击破敌人', () => {
     return w.playSelectedCard();
   }
 
+  /** 把敌人移到自机正上方，确保子弹能打中 */
+  function placeAbovePlayer(w: World, hp: number): void {
+    w.spawnEnemy({ hp, radius: 12, score: 100, coin: 5 }, w.player.x, w.player.y - 80);
+    w.step();
+    // 敌人入列后立即固定位置（避免它飘走）
+    const e = w.enemies[w.enemies.length - 1];
+    if (e) {
+      e.x = w.player.x;
+      e.y = w.player.y - 80;
+      e.moveTo(e.x, e.y);
+    }
+  }
+
   it('卡牌伤害能击破敌人并累加得分与金钱', () => {
     const w = new World({ seed: 1 });
-
-    // 放一个血薄的敌人
-    w.spawnEnemy({ hp: 10, radius: 10, score: 100, coin: 5 }, w.player.x, w.player.y - 120);
-    w.step(); // 让敌人入列
+    placeAbovePlayer(w, 10);
 
     const before = w.kills;
     const played = playDamageCard(w);
     expect(played).toBe(true);
+
+    // 符击是持续射击，跑几帧让子弹命中
+    stepN(w, 40);
 
     expect(w.kills).toBe(before + 1);
     expect(w.score).toBe(100);
@@ -66,22 +80,21 @@ describe('World 用卡牌击破敌人', () => {
 
   it('血厚的敌人不会被一张卡打死', () => {
     const w = new World({ seed: 1 });
-    w.spawnEnemy({ hp: 9999, radius: 12, score: 100, coin: 5 }, w.player.x, w.player.y - 120);
-    w.step();
+    placeAbovePlayer(w, 99999);
 
     playDamageCard(w);
+    stepN(w, 60);
     expect(w.kills).toBe(0);
     expect(w.aliveEnemyCount).toBe(1);
   });
 
   it('被击破的敌人最终从数组移除', () => {
     const w = new World({ seed: 1 });
-    w.spawnEnemy({ hp: 1, radius: 10, score: 1, coin: 1 }, w.player.x, w.player.y - 80);
-    w.step();
+    placeAbovePlayer(w, 1);
 
     playDamageCard(w);
-    // 等消散动画结束
-    stepN(w, 60);
+    // 命中 + 等消散动画结束
+    stepN(w, 120);
     expect(w.aliveEnemyCount).toBe(0);
     expect(w.enemies.length).toBe(0);
   });
@@ -174,7 +187,7 @@ describe('World 确定性', () => {
 
     expect(a.player.x).toBeCloseTo(b.player.x, 10);
     expect(a.player.y).toBeCloseTo(b.player.y, 10);
-    expect(a.playerShots.aliveCount).toBe(b.playerShots.aliveCount);
+    expect(a.cardShots.shots.aliveCount).toBe(b.cardShots.shots.aliveCount);
     expect(a.kills).toBe(b.kills);
   });
 });
@@ -221,7 +234,7 @@ describe('World 场地', () => {
     expect(w.score).toBe(0);
     expect(w.coins).toBe(0);
     expect(w.enemies.length).toBe(0);
-    expect(w.playerShots.aliveCount).toBe(0);
+    expect(w.cardShots.shots.aliveCount).toBe(0);
     expect(w.player.lives).toBe(3);
   });
 });

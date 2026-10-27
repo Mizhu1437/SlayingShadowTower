@@ -8,7 +8,7 @@
 import { BulletField } from '../danmaku/bulletField';
 
 /** 自机子弹的视觉类型，渲染层按它选贴图 */
-export type ShotKind = 'needle' | 'orb' | 'talisman';
+export type ShotKind = 'needle' | 'orb' | 'talisman' | 'firebird';
 
 export class PlayerShots {
   readonly field: BulletField;
@@ -18,6 +18,7 @@ export class PlayerShots {
   static readonly KIND_NEEDLE = 0;
   static readonly KIND_ORB = 1;
   static readonly KIND_TALISMAN = 2;
+  static readonly KIND_FIREBIRD = 3;
 
   constructor(capacity = 1024) {
     this.field = new BulletField(capacity);
@@ -37,7 +38,8 @@ export class PlayerShots {
     this.kind[i] =
       kind === 'orb' ? PlayerShots.KIND_ORB
         : kind === 'talisman' ? PlayerShots.KIND_TALISMAN
-          : PlayerShots.KIND_NEEDLE;
+          : kind === 'firebird' ? PlayerShots.KIND_FIREBIRD
+            : PlayerShots.KIND_NEEDLE;
     return i;
   }
 

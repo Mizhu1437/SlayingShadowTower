@@ -6,6 +6,7 @@
 
 import { Emitter, type EmitterSpec } from './danmaku/emitter';
 import type { BulletField } from './danmaku/bulletField';
+import { EnemyStatus, WEAK_FIRE_FACTOR } from './status';
 
 export interface EnemyConfig {
   hp: number;
@@ -47,6 +48,9 @@ export class Enemy {
   private emitter: Emitter | null = null;
   private fireCooldown = 0;
   private readonly fireInterval: number;
+
+  /** 状态效果（虚弱 / 燃烧） */
+  readonly status: EnemyStatus = new EnemyStatus();
 
   constructor(cfg: EnemyConfig, x: number, y: number, targetY?: number) {
     this.hp = cfg.hp;
@@ -108,7 +112,13 @@ export class Enemy {
       this.fireCooldown -= dt;
       if (this.fireCooldown <= 0) {
         this.fireCooldown += this.fireInterval;
-        this.emitter.burst(this.x, this.y, bullets);
+
+        // 虚弱：发射的弹幕量减少 25%
+        if (this.status.isWeak) {
+          this.emitter.burst(this.x, this.y, bullets, WEAK_FIRE_FACTOR);
+        } else {
+          this.emitter.burst(this.x, this.y, bullets);
+        }
       }
     }
   }

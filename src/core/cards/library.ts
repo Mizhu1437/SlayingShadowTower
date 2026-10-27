@@ -2,201 +2,103 @@
  * 初始卡组与卡池。
  *
  * 所有卡都是数据，引擎不按 id 分支。
- * 这里的定义将来会迁移到 data/cards/*.json。
+ * 初始卡组按用户设计（大作业安排.md）实现：
+ *
+ *   藤原妹红：4 张符击 + 3 张防御 + 1 张凤翼天翔 = 8 张
+ *
+ * 注：卡组总数必须大于手牌上限（6），否则手牌攒满时
+ * 抽牌堆与弃牌堆都会空掉，抽牌机制失效。8 张满足这个下限。
  */
 
 import type { CardDef } from './def';
 
 // ─────────────────────────────────────────────
-// 初始主动卡组：玩家开局就有的 10 张
-//
-// 为什么是 10 张而不是 5 张：
-//   手牌上限 U = 6。如果卡组总数 <= U，手牌攒到接近上限时
-//   抽牌堆和弃牌堆都会空掉，任何抽牌都拿不到牌 —— 机制死锁。
-//   卡组必须明显大于手牌上限，才能让"抽牌堆耗尽→弃牌堆洗回"这个循环运转起来。
-//
-// 10 张 = 上限 6 + 余量 4，且与《杀戮尖塔》初始卡组规模一致。
-// 必须包含至少 1 张保命卡（清弹/无敌）。
+// 初始主动卡组（藤原妹红）
 // ─────────────────────────────────────────────
 export const STARTER_CARDS: CardDef[] = [
-  {
-    id: 'starter_barrier',
-    name: '结界符',
+  // ── 符击 ×4 ──
+  // 1 费，在之后的 5 秒内，向机体前方持续发射 3 束符札。
+  // 用 burst_fire 表达"持续射击窗口"：5 秒内每 0.25 秒一组、每组 3 发。
+  ...Array.from({ length: 4 }, (_, i): CardDef => ({
+    id: `hougeki_${i}`,
+    name: '符击',
     type: 'active',
     rarity: 'starter',
     price: 0,
-    energy: 2,
-    text: '清除大范围内的敌弹，并获得 1 秒无敌。',
+    energy: 1,
+    text: '在 5 秒内向前方持续发射 3 束符札。',
     effects: [
-      { op: 'clear_bullets', radius: 110 },
-      { op: 'invuln', seconds: 1.0 },
+      {
+        op: 'burst_fire',
+        duration: 5,
+        interval: 0.25,
+        count: 3,
+        damage: 25,
+        speed: 620,
+        pierce: 0,
+      },
+    ],
+    tags: ['damage', 'sustained'],
+  })),
+
+  // ── 防御 ×3 ──
+  // 1 费，清除周围一小部分弹幕，获得 2.5 秒无敌。
+  ...Array.from({ length: 3 }, (_, i): CardDef => ({
+    id: `bougyo_${i}`,
+    name: '防御',
+    type: 'active',
+    rarity: 'starter',
+    price: 0,
+    energy: 1,
+    text: '清除周围弹幕，获得 2.5 秒无敌。',
+    effects: [
+      { op: 'clear_bullets', radius: 105 },
+      { op: 'invuln', seconds: 2.5 },
     ],
     tags: ['defense', 'clear'],
-  },
+  })),
+
+  // ── 凤翼天翔 ×1 ──
+  // 2 费，向前方发射可穿透的凤凰，高额伤害；
+  // 命中敌人附加 10 秒「虚弱」与「燃烧」。
   {
-    id: 'starter_burst',
-    name: '散弹符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '对全体敌人造成 60 点伤害。',
-    effects: [{ op: 'damage_all', value: 60 }],
-    tags: ['damage'],
-  },
-  {
-    id: 'starter_focus',
-    name: '凝神符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '立即抽 2 张牌。',
-    effects: [{ op: 'draw', count: 2 }],
-    tags: ['draw'],
-  },
-  {
-    id: 'starter_ward',
-    name: '护身符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '获得 1.5 秒无敌。',
-    effects: [{ op: 'invuln', seconds: 1.5 }],
-    tags: ['defense'],
-  },
-  {
-    id: 'starter_strike',
-    name: '斩击符',
+    id: 'houyokutenshou',
+    name: '不死「火鸟 -凤翼天翔-」',
     type: 'active',
     rarity: 'starter',
     price: 0,
     energy: 2,
-    text: '对全体敌人造成 150 点伤害。',
-    effects: [{ op: 'damage_all', value: 150 }],
-    tags: ['damage'],
-  },
-  // ── 以下 5 张补齐到 10，构成可循环的牌堆 ──
-  {
-    id: 'starter_needle',
-    name: '针符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '对全体敌人造成 45 点伤害。',
-    effects: [{ op: 'damage_all', value: 45 }],
-    tags: ['damage'],
-  },
-  {
-    id: 'starter_sweep',
-    name: '扫符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '清除周围小范围的敌弹。',
-    effects: [{ op: 'clear_bullets', radius: 80 }],
-    tags: ['defense', 'clear'],
-  },
-  {
-    id: 'starter_meditate',
-    name: '静心符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 0,
-    text: '抽 1 张牌。',
-    effects: [{ op: 'draw', count: 1 }],
-    tags: ['draw'],
-  },
-  {
-    id: 'starter_talisman',
-    name: '符札',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 1,
-    text: '对全体敌人造成 70 点伤害。',
-    effects: [{ op: 'damage_all', value: 70 }],
-    tags: ['damage'],
-  },
-  {
-    id: 'starter_veil',
-    name: '幕符',
-    type: 'active',
-    rarity: 'starter',
-    price: 0,
-    energy: 2,
-    text: '获得 2 秒无敌。',
-    effects: [{ op: 'invuln', seconds: 2.0 }],
-    tags: ['defense'],
+    text: '发射穿透的凤凰造成高额伤害，命中者虚弱并燃烧 10 秒。',
+    effects: [
+      {
+        op: 'pierce_shot',
+        count: 1,
+        damage: 400,
+        speed: 380,
+        pierce: 99,
+        radius: 26,
+        kind: 'firebird',
+      },
+      { op: 'apply_status', status: 'weak', seconds: 10 },
+      { op: 'apply_status', status: 'burn', seconds: 10 },
+    ],
+    tags: ['damage', 'pierce', 'debuff'],
   },
 ];
 
 // ─────────────────────────────────────────────
-// 被动卡池：决定自机火力形态
+// 被动卡池
 // ─────────────────────────────────────────────
 export const PASSIVE_POOL: CardDef[] = [
-  {
-    id: 'p_double',
-    name: '双发符片',
-    type: 'passive',
-    rarity: 'common',
-    price: 50,
-    text: '子弹数 +1，单发伤害 -10%。',
-    modifiers: [
-      { op: 'add', stat: 'count', value: 1 },
-      { op: 'mul', stat: 'damage', value: 0.9 },
-    ],
-    tags: ['shot', 'spread'],
-  },
   {
     id: 'p_sharp',
     name: '锋利符片',
     type: 'passive',
     rarity: 'common',
     price: 55,
-    text: '单发伤害 +3。',
+    text: '卡牌伤害 +6%。',
     modifiers: [{ op: 'add', stat: 'damage', value: 3 }],
-    tags: ['shot', 'damage'],
-  },
-  {
-    id: 'p_rapid',
-    name: '疾射符片',
-    type: 'passive',
-    rarity: 'common',
-    price: 60,
-    text: '射击间隔 -15%，伤害 -10%。',
-    modifiers: [
-      { op: 'mul', stat: 'interval', value: 0.85 },
-      { op: 'mul', stat: 'damage', value: 0.9 },
-    ],
-    tags: ['shot', 'speed'],
-  },
-  {
-    id: 'p_pierce',
-    name: '贯穿符片',
-    type: 'passive',
-    rarity: 'uncommon',
-    price: 85,
-    text: '子弹可穿透 +1 个敌人，射速略降。',
-    modifiers: [
-      { op: 'add', stat: 'pierce', value: 1 },
-      { op: 'mul', stat: 'interval', value: 1.1 },
-    ],
-    tags: ['shot', 'pierce'],
-  },
-  {
-    id: 'p_wide',
-    name: '广域符片',
-    type: 'passive',
-    rarity: 'uncommon',
-    price: 80,
-    text: '扇形角 +8 度，命中范围更宽。',
-    modifiers: [{ op: 'add', stat: 'spread', value: 0.14 }],
-    tags: ['shot', 'spread'],
+    tags: ['damage'],
   },
   {
     id: 'p_heavy',
@@ -204,12 +106,19 @@ export const PASSIVE_POOL: CardDef[] = [
     type: 'passive',
     rarity: 'uncommon',
     price: 90,
-    text: '伤害 ×1.6，射速降 20%。',
-    modifiers: [
-      { op: 'mul', stat: 'damage', value: 1.6 },
-      { op: 'mul', stat: 'interval', value: 1.2 },
-    ],
-    tags: ['shot', 'damage'],
+    text: '卡牌伤害 ×1.6。',
+    modifiers: [{ op: 'mul', stat: 'damage', value: 1.6 }],
+    tags: ['damage'],
+  },
+  {
+    id: 'p_rapid',
+    name: '疾射符片',
+    type: 'passive',
+    rarity: 'common',
+    price: 60,
+    text: '打出卡牌所需能量 -0.3。',
+    modifiers: [{ op: 'mul', stat: 'interval', value: 0.85 }],
+    tags: ['energy'],
   },
   {
     id: 'p_spell_wide',
@@ -234,7 +143,7 @@ export const PASSIVE_POOL: CardDef[] = [
 ];
 
 // ─────────────────────────────────────────────
-// 主动卡池：商店可买
+// 主动卡池（商店可买）
 // ─────────────────────────────────────────────
 export const ACTIVE_POOL: CardDef[] = [
   {
@@ -285,23 +194,6 @@ export const ACTIVE_POOL: CardDef[] = [
     tags: ['economy'],
   },
   {
-    id: 'a_desperate',
-    name: '绝境符',
-    type: 'active',
-    rarity: 'rare',
-    price: 110,
-    energy: 1,
-    text: '若残机为 1，对全体敌人造成 500 伤害。',
-    effects: [
-      {
-        op: 'if_low_life',
-        threshold: 1,
-        then: [{ op: 'damage_all', value: 500 }],
-      },
-    ],
-    tags: ['damage', 'conditional'],
-  },
-  {
     id: 'a_slow',
     name: '缓时符',
     type: 'active',
@@ -338,7 +230,7 @@ export function getCard(id: string): CardDef | undefined {
   return BY_ID.get(id);
 }
 
-/** 玩家开局的完整卡组（目前只有主动卡） */
+/** 玩家开局的完整卡组 */
 export function createStarterDeck(): CardDef[] {
   return STARTER_CARDS.map((c) => ({ ...c }));
 }

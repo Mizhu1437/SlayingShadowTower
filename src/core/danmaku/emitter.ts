@@ -95,14 +95,21 @@ export class Emitter {
   }
 
   /** 立即打出一组（不经过冷却） */
-  burst(x: number, y: number, field: BulletField): number {
+  /**
+   * 打出一组子弹。
+   *
+   * @param fireScale 火力系数（默认 1）。虚弱状态会传 0.75，
+   *                  使发射量减少 25%。取整后至少保留 1 发。
+   */
+  burst(x: number, y: number, field: BulletField, fireScale = 1): number {
     const s = this.spec;
     const n = s.nested;
     // 嵌套发射时角度随次数偏移
     const stepRad = n?.stepDeg ? n.stepDeg * DEG * this.firedCount : 0;
     const speedAdd = n?.speedStep ? n.speedStep * this.firedCount : 0;
 
-    const count = Math.max(0, Math.round(s.count));
+    const rawCount = Math.round(s.count * fireScale);
+    const count = Math.max(0, rawCount);
     if (count === 0) return 0;
 
     const baseAngle = s.angle + stepRad;

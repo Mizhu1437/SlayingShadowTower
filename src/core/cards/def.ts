@@ -23,6 +23,27 @@ export type Rarity = 'starter' | 'common' | 'uncommon' | 'rare';
 export type EffectOp =
   | { op: 'damage_all'; value: number }
   | { op: 'damage_boss'; value: number }
+  /** 发射一枚穿透弹（如「凤翼天翔」的凤凰） */
+  | {
+    op: 'pierce_shot';
+    count: number;
+    damage: number;
+    speed: number;
+    pierce: number;
+    radius?: number;
+    /** 视觉类型，默认 talisman；凤翼天翔用 firebird */
+    kind?: 'needle' | 'orb' | 'talisman' | 'firebird';
+  }
+  /** 持续射击窗口：在 duration 秒内每 interval 秒发射一组（如「符击」） */
+  | {
+    op: 'burst_fire';
+    duration: number;
+    interval: number;
+    count: number;
+    damage: number;
+    speed: number;
+    pierce: number;
+  }
   | { op: 'clear_bullets'; radius: number }
   | { op: 'gain_energy'; value: number }
   | { op: 'gain_coin'; value: number }
@@ -31,6 +52,8 @@ export type EffectOp =
   | { op: 'draw'; count: number }
   | { op: 'invuln'; seconds: number }
   | { op: 'bullet_slow'; seconds: number; factor: number }
+  /** 对场上敌人附加状态（虚弱 / 燃烧） */
+  | { op: 'apply_status'; status: 'weak' | 'burn'; seconds: number }
   | { op: 'if_low_life'; threshold: number; then: EffectOp[] };
 
 /** 卡牌定义 */

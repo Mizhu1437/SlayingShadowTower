@@ -8,7 +8,8 @@
  */
 
 import { Player, type InputState } from './player';
-import { PlayerShots } from './shot/playerShots';
+import { CardShots } from './shot/cardShots';
+import { BURN_CONFIG } from './status';
 import { Enemy, type EnemyConfig } from './enemy';
 import { BulletField } from './danmaku/bulletField';
 import { SpatialGrid } from './danmaku/spatialGrid';
@@ -42,7 +43,8 @@ interface SpawnRequest {
 
 export class World {
   readonly player: Player;
-  readonly playerShots: PlayerShots;
+  /** 卡牌驱动的自机子弹（穿透弹 + 持续射击窗口） */
+  readonly cardShots: CardShots;
   readonly enemyBullets: BulletField;
   readonly enemies: Enemy[] = [];
   readonly rng: Rng;
@@ -97,7 +99,7 @@ export class World {
     this.seed = cfg.seed;
     this.rng = new Rng(cfg.seed);
     this.player = new Player(FIELD_W / 2, FIELD_H * 0.82);
-    this.playerShots = new PlayerShots(1024);
+    this.cardShots = new CardShots(1024);
     this.enemyBullets = new BulletField(4096);
     this.shotGrid = new SpatialGrid(FIELD_W, FIELD_H, 32, 256);
     // 每局独立的 Rng 派生，保证洗牌顺序可复现且不影响波次生成
@@ -201,6 +203,57 @@ export class World {
   /** 最近一次 startAct 的失败原因 */
   lastStageError = '';
 
+  /**
+   * 推进敌人状态：燃烧伤害与点燃传播。
+   *
+   * 点燃规则（按用户设计）：
+   *   燃烧中的敌人会点燃附近的、尚未燃烧的敌人，
+   *   使对方获得**与燃烧源等长**的燃烧时间。
+   */
+  private stepEnemyStatus(): void {
+    const burningSources: { x: number; y: number; remain: number }[] = [];
+
+    for (const e of this.enemies) {
+      if (!e.targetable) continue;
+
+      const burnDmg = e.status.step(LOGIC_DT, e.maxHp);
+      if (burnDmg > 0) {
+        e.hp = Math.max(0, e.hp - burnDmg);
+        if (e.hp <= 0 && !e.dead) {
+          e.dead = true;
+          e.fadeOut = 0.25;
+          this.score += e.score;
+          this.coins += e.coin;
+          this.kills++;
+        }
+      }
+
+      // 记录需要传播的燃烧源
+      if (e.status.pendingSpread) {
+        e.status.pendingSpread = false;
+        burningSources.push({
+          x: e.x, y: e.y, remain: e.status.remain('burn'),
+        });
+      }
+    }
+
+    // 点燃传播
+    if (burningSources.length === 0) return;
+
+    const r2 = BURN_CONFIG.spreadRadius * BURN_CONFIG.spreadRadius;
+    for (const src of burningSources) {
+      for (const e of this.enemies) {
+        if (!e.targetable) continue;
+        if (e.status.isBurning) continue;   // 已燃烧的不重复点燃
+        const dx = e.x - src.x;
+        const dy = e.y - src.y;
+        if (dx * dx + dy * dy <= r2) {
+          e.status.apply('burn', src.remain);
+        }
+      }
+    }
+  }
+
   /** 当前幕编号（0 起） */
   currentAct = 0;
 
@@ -291,6 +344,21 @@ export class World {
         self.bulletSlowLeft = Math.max(self.bulletSlowLeft, s);
         self.bulletSlowFactor = Math.min(self.bulletSlowFactor, f);
       },
+      firePierce: (count, damage, speed, pierce, radius, kind) =>
+        self.cardShots.firePierce(
+          self.player, count, damage, speed, pierce, radius, kind,
+        ),
+      startBurst: (duration, interval, count, damage, speed, pierce) =>
+        self.cardShots.startBurst(duration, interval, count, damage, speed, pierce),
+      applyStatus: (status, seconds) => {
+        let n = 0;
+        for (const e of self.enemies) {
+          if (!e.targetable) continue;
+          e.status.apply(status, seconds);
+          n++;
+        }
+        return n;
+      },
       get currentLives() {
         return self.player.lives;
       },
@@ -367,13 +435,17 @@ export class World {
     //
     // 影响：被动卡不再修改自动射击，而是修改**主动卡的效果**（见 Deck.resolveCardPower）。
 
-    // 4. 自机子弹推进（现仅用于保留将来可能的射击类效果）
-    this.playerShots.integrate(LOGIC_DT);
+    // 4. 自机子弹推进（卡牌驱动的穿透弹与持续射击）
+    this.cardShots.step(this.player);
+    this.cardShots.shots.integrate(LOGIC_DT);
 
     // 5. 敌人移动与开火（符卡冻结时暂停开火）
     for (const e of this.enemies) {
       e.step(LOGIC_DT, this.spell.frozen ? null : this.enemyBullets);
     }
+
+    // 5.5 敌人状态推进（燃烧伤害 + 点燃传播）
+    this.stepEnemyStatus();
 
     // 6. 自机子弹 vs 敌人
     this.resolveShotHits();
@@ -388,9 +460,9 @@ export class World {
     this.cleanupEnemies();
   }
 
-  /** 自机子弹打敌人：以敌人为中心查网格，规模小，直接遍历即可 */
+  /** 自机子弹打敌人 */
   private resolveShotHits(): void {
-    const s = this.playerShots.field;
+    const s = this.cardShots.shots.field;
     if (s.aliveCount === 0) return;
 
     const limit = s.scanLimit;
@@ -408,15 +480,20 @@ export class World {
         const rr = e.radius + s.radius[i]!;
         if (dx * dx + dy * dy > rr * rr) continue;
 
-        const killed = e.damage(this.playerShots.damage[i]!);
-        s.state[i] = 0;
-        s.aliveCount--;
+        const killed = e.damage(this.cardShots.shots.damage[i]!);
         if (killed) {
           this.score += e.score;
           this.coins += e.coin;
           this.kills++;
         }
-        break; // 一颗子弹只打一个敌人
+
+        // 穿透：还有剩余次数就继续飞，否则消失
+        if (!this.cardShots.consumePierce(i)) {
+          s.state[i] = 0;
+          s.aliveCount--;
+          break;
+        }
+        // 还能穿透时，继续对下一个敌人判定（不 break）
       }
     }
   }
@@ -535,7 +612,7 @@ export class World {
 
     // 清掉场上所有敌弹，避免刚复活就被打
     this.enemyBullets.clear();
-    this.playerShots.clear();
+    this.cardShots.clear();
 
     // 清掉排队中还没生成的敌人，以及自机周围 200px 内的敌人
     this.pendingSpawns.length = 0;
@@ -569,7 +646,7 @@ export class World {
 
   reset(): void {
     this.player.reset(FIELD_W / 2, FIELD_H * 0.82);
-    this.playerShots.clear();
+    this.cardShots.clear();
     this.enemyBullets.clear();
     this.enemies.length = 0;
     this.pendingSpawns.length = 0;

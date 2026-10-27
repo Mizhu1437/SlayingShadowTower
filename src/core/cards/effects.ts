@@ -27,6 +27,18 @@ export interface EffectContext {
   grantInvuln(seconds: number): void;
   /** 敌弹减速 */
   slowBullets(seconds: number, factor: number): void;
+  /** 立刻发射穿透弹，返回发射数 */
+  firePierce(
+    count: number, damage: number, speed: number, pierce: number, radius: number,
+    kind?: 'needle' | 'orb' | 'talisman' | 'firebird',
+  ): number;
+  /** 开启持续射击窗口 */
+  startBurst(
+    duration: number, interval: number, count: number,
+    damage: number, speed: number, pierce: number,
+  ): void;
+  /** 对场上敌人施加状态，返回受影响敌人数 */
+  applyStatus(status: 'weak' | 'burn', seconds: number): number;
   /** 当前残机 */
   readonly currentLives: number;
 }
@@ -95,6 +107,34 @@ export function executeEffects(
       case 'bullet_slow': {
         ctx.slowBullets(e.seconds, e.factor);
         log.push({ op: e.op, detail: `敌弹减速至 ${e.factor}×，${e.seconds} 秒` });
+        break;
+      }
+      case 'pierce_shot': {
+        const n = ctx.firePierce(
+          e.count, e.damage, e.speed, e.pierce, e.radius ?? 12, e.kind,
+        );
+        log.push({
+          op: e.op,
+          detail: `发射 ${n} 枚穿透弹（伤害 ${e.damage}，穿透 ${e.pierce}）`,
+        });
+        break;
+      }
+      case 'burst_fire': {
+        ctx.startBurst(
+          e.duration, e.interval, e.count, e.damage, e.speed, e.pierce,
+        );
+        log.push({
+          op: e.op,
+          detail: `${e.duration} 秒内每 ${e.interval} 秒发射 ${e.count} 发`,
+        });
+        break;
+      }
+      case 'apply_status': {
+        const n = ctx.applyStatus(e.status, e.seconds);
+        log.push({
+          op: e.op,
+          detail: `${n} 个敌人获得${e.status === 'weak' ? '虚弱' : '燃烧'} ${e.seconds} 秒`,
+        });
         break;
       }
       case 'if_low_life': {
