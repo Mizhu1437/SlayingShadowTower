@@ -93,7 +93,7 @@ git status        # 确认暂存区只有该提交该有的文件
 | :--- | :--- |
 | 触发 | 推送到 `main` |
 | 流程 | typecheck → test → build → 部署到 GitHub Pages |
-| 站点 | https://mizhu1437.github.io/Touhou-luyingta/ |
+| 站点 | https://mizhu1437.github.io/SlayingShadowTower/ |
 | 失败处理 | **先修 CI 再继续**，不要带着红叉往下开发 |
 
 ---

@@ -4,11 +4,11 @@
 >
 > **本作品是东方 Project 的二次创作。** 非官方作品，与上海爱丽丝幻乐团无从属关系。
 
-**仓库：** [Mizhu1437/Touhou-luyingta](https://github.com/Mizhu1437/Touhou-luyingta) · **版本：** v0.1.0（开发中）
+**仓库：** [Mizhu1437/SlayingShadowTower](https://github.com/Mizhu1437/SlayingShadowTower) · **版本：** v0.1.0（开发中）
 
 ## 🎮 在线试玩
 
-**▶ https://mizhu1437.github.io/Touhou-luyingta/**
+**▶ https://mizhu1437.github.io/SlayingShadowTower/**
 
 浏览器直接打开即可，无需安装。首次加载约 2–3 秒。
 

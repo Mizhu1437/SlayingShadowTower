@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 // 资源引用必须带上前缀，否则会去根域名找 /assets/* 而 404。
 // 本地 dev 与 preview 不需要前缀，由 GH_PAGES 环境变量区分。
 const isGhPages = process.env.GH_PAGES === '1';
-const repoBase = '/Touhou-luyingta/';
+const repoBase = '/SlayingShadowTower/';
 
 export default defineConfig({
   base: isGhPages ? repoBase : '/',
