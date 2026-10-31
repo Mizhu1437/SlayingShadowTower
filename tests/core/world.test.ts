@@ -62,7 +62,7 @@ describe('World 用卡牌击破敌人', () => {
     }
   }
 
-  it('卡牌伤害能击破敌人并累加得分与金钱', () => {
+  it('卡牌伤害能击破敌人并累加得分', () => {
     const w = new World({ seed: 1 });
     placeAbovePlayer(w, 10);
 
@@ -75,7 +75,43 @@ describe('World 用卡牌击破敌人', () => {
 
     expect(w.kills).toBe(before + 1);
     expect(w.score).toBe(100);
-    expect(w.coins).toBe(5);
+  });
+
+  it('敌人死亡爆出蜃銭而不是直接加数字', () => {
+    const w = new World({ seed: 1 });
+    placeAbovePlayer(w, 10);
+
+    const coinsBefore = w.coins;
+    playDamageCard(w);
+    stepN(w, 40);
+
+    // 击杀后：金币数不变，场上多出掉落物
+    expect(w.coins).toBe(coinsBefore);
+    expect(w.coinDrops.length).toBeGreaterThan(0);
+
+    const droppedTotal = w.coinDrops.reduce((s2, c) => s2 + c.amount, 0);
+    expect(droppedTotal).toBe(5);   // 该敌人掉落 5
+  });
+
+  it('捡起掉落的蜃銭后金币增加', () => {
+    const w = new World({ seed: 1 });
+    placeAbovePlayer(w, 10);
+
+    const coinsBefore = w.coins;
+    playDamageCard(w);
+    stepN(w, 40);
+
+    // 把自机挪到掉落物上，并等拾取冷却
+    for (let i = 0; i < 200 && w.coinDrops.length > 0; i++) {
+      const c = w.coinDrops[0];
+      if (c) {
+        w.player.x = c.x;
+        w.player.y = c.y;
+      }
+      w.step();
+    }
+
+    expect(w.coins).toBeGreaterThan(coinsBefore);
   });
 
   it('血厚的敌人不会被一张卡打死', () => {

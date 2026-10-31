@@ -63,6 +63,20 @@ export const MISS_CONFIG = {
   coinPickRadius: 14,
   /** 刚爆出后多久才可拾取（秒），让金币先散开 */
   coinPickupDelay: 0.6,
+  /**
+   * 重力加速度（像素/秒²）。
+   *
+   * 金币要能"下落"：爆出时向上抛（负 vy），随后被重力拉下来，
+   * 最后落到底部停住。数值参考自机移动速度（300 px/s）：
+   * 让金币大约 0.6 秒落到屏幕下部，玩家有时间看清并冲过去。
+   */
+  coinGravity: 620,
+  /** 落地后的水平摩擦（每秒衰减比例） */
+  coinGroundFriction: 0.86,
+  /** 落地反弹系数（0 = 不弹，1 = 完全反弹） */
+  coinBounce: 0.32,
+  /** 落入场地底部时的 y 位置偏移 */
+  coinFloorOffset: 14,
 } as const;
 
 /** 掉落的蜃銭 */
@@ -285,9 +299,7 @@ export class World {
         if (e.hp <= 0 && !e.dead) {
           e.dead = true;
           e.fadeOut = 0.25;
-          this.score += e.score;
-          this.coins += e.coin;
-          this.kills++;
+          this.onEnemyKilled(e);
         }
       }
 
@@ -508,9 +520,7 @@ export class World {
         for (const e of self.enemies) {
           if (!e.targetable) continue;
           if (e.damage(v)) {
-            self.score += e.score;
-            self.coins += e.coin;
-            self.kills++;
+            self.onEnemyKilled(e);
             kills++;
           }
         }
@@ -595,11 +605,8 @@ export class World {
       if (req.damage > 0) {
         for (const e of this.enemies) {
           if (!e.targetable) continue;
-          const killed = e.damage(req.damage);
-          if (killed) {
-            this.score += e.score;
-            this.coins += e.coin;
-            this.kills++;
+          if (e.damage(req.damage)) {
+            this.onEnemyKilled(e);
           }
         }
       }
@@ -680,11 +687,8 @@ export class World {
         const rr = e.radius + s.radius[i]!;
         if (dx * dx + dy * dy > rr * rr) continue;
 
-        const killed = e.damage(this.cardShots.shots.damage[i]!);
-        if (killed) {
-          this.score += e.score;
-          this.coins += e.coin;
-          this.kills++;
+        if (e.damage(this.cardShots.shots.damage[i]!)) {
+          this.onEnemyKilled(e);
         }
 
         // 穿透：还有剩余次数就继续飞，否则消失
@@ -804,13 +808,35 @@ export class World {
   }
 
   /**
+   * 统一的击杀结算。
+   *
+   * 为什么抽成一个方法：之前四个地方（燃烧、卡牌、符卡、子弹）
+   * 各自写了「加分 + 加钱 + 计数」三行，容易漏改。
+   * 现在钱不再是直接加数字，而是爆成掉落物 —— 只改一处就够。
+   */
+  private onEnemyKilled(e: Enemy): void {
+    this.score += e.score;
+    this.kills++;
+    // 蜃銭不再是直接加进数字，而是在敌人位置爆出来让玩家去捡
+    if (e.coin > 0) {
+      this.spawnCoinDrop(e.x, e.y, e.coin);
+    }
+  }
+
+  /**
    * 在指定位置生成一堆可拾取的蜃銭。
    *
    * 用「一簇多个小金币」而不是单个大金币：
    * 撒开的形状让玩家能看清哪里掉了钱，视觉上更像原作爆出的 P 点。
    */
   private spawnCoinDrop(x: number, y: number, totalAmount: number): void {
-    const n = Math.min(MISS_CONFIG.maxCoinDrops, Math.max(3, Math.ceil(totalAmount / 8)));
+    if (totalAmount <= 0) return;
+
+    // 面额 → 物件数：小钱 1-2 个，大钱散成一簇
+    const n = Math.min(
+      MISS_CONFIG.maxCoinDrops,
+      Math.max(1, Math.round(totalAmount / 6)),
+    );
     const per = Math.max(1, Math.floor(totalAmount / n));
 
     for (let i = 0; i < n; i++) {
@@ -821,8 +847,9 @@ export class World {
         x: x + Math.cos(angle) * dist,
         y: y + Math.sin(angle) * dist,
         amount: per,
-        vx: Math.cos(angle) * 40,
-        vy: Math.sin(angle) * 40 - 30,
+        // 向上抛 + 横向散开，之后由重力拉下来
+        vx: Math.cos(angle) * (55 + this.rng.next() * 45),
+        vy: Math.sin(angle) * 30 - (110 + this.rng.next() * 70),
         life: MISS_CONFIG.coinDropLife,
         collected: false,
         pickupDelay: MISS_CONFIG.coinPickupDelay,
@@ -859,11 +886,33 @@ export class World {
         continue;
       }
 
-      // 惯性 + 阻尼
+      // ── 物理：重力下落 + 落地反弹 + 摩擦 ──
+      c.vy += MISS_CONFIG.coinGravity * LOGIC_DT;
+
       c.x += c.vx * LOGIC_DT;
       c.y += c.vy * LOGIC_DT;
-      c.vx *= 0.94;
-      c.vy *= 0.94;
+
+      const floorY = FIELD_H - MISS_CONFIG.coinFloorOffset;
+      if (c.y >= floorY) {
+        // 触底：反弹一次，速度衰减
+        c.y = floorY;
+        if (Math.abs(c.vy) > 40) {
+          c.vy = -c.vy * MISS_CONFIG.coinBounce;
+        } else {
+          c.vy = 0;
+        }
+        // 地面摩擦
+        c.vx *= MISS_CONFIG.coinGroundFriction;
+      }
+
+      // 左右边界：碰壁反弹，避免钱飞出场地
+      if (c.x < 6) {
+        c.x = 6;
+        c.vx = Math.abs(c.vx) * 0.5;
+      } else if (c.x > FIELD_W - 6) {
+        c.x = FIELD_W - 6;
+        c.vx = -Math.abs(c.vx) * 0.5;
+      }
 
       // 刚爆出时不可拾取，也不被吸引，让金币先散开
       if (c.pickupDelay > 0) {
