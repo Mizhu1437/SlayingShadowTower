@@ -32,12 +32,30 @@ export interface SpellCardDef {
   freezeTime: number;
 }
 
+/**
+ * 符卡释放的两个核心效果（用户 2026-10-31 明确）：
+ *   1. 消弹 —— 清除全屏敌弹
+ *   2. 全屏伤害 —— 对场上所有敌人造成伤害
+ *
+ * 两个效果都是「无条件生效」，不依赖命中或距离。
+ * 这让符卡成为纯粹的 resource：交了就有确定的回报。
+ */
 export const DEFAULT_SPELL: SpellCardDef = {
   id: 'spell_default',
   name: '符片解放',
+  /** 消弹半径：9999 视为全屏 */
   clearRadius: 9999,
+  /** 释放后的无敌时间 */
   invulnTime: 2.0,
-  damage: 0,
+  /**
+   * 全屏伤害。
+   *
+   * 取值依据：第一幕关底 BOSS 血量 1800，符卡初始 3 张。
+   * 若设为 1800 则三张卡能秒 BOSS，显然过强。
+   * 取 600 = BOSS 血量的 1/3，三张全交可打掉一管血，
+   * 既保留了"符卡是重要资源"的分量，又不至于让 BOSS 战失去意义。
+   */
+  damage: 600,
   freezeTime: 0,
 };
 

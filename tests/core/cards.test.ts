@@ -390,11 +390,13 @@ describe('Deck 被动卡结算（改为卡牌威力）', () => {
 });
 
 describe('Deck 符卡改造', () => {
-  it('无被动时是默认符卡', () => {
+  it('无被动时是默认符卡（带全屏伤害）', () => {
     const d = new Deck(new Rng(1), createStarterDeck());
     const s = d.resolveSpell();
     expect(s.invulnTime).toBe(2.0);
-    expect(s.damage).toBe(0);
+    // 默认符卡有全屏伤害（用户 2026-10-31 明确）
+    expect(s.damage).toBe(600);
+    expect(s.clearRadius).toBeGreaterThanOrEqual(9999);
   });
 
   it('广域符卡增加无敌时间', () => {
@@ -404,11 +406,12 @@ describe('Deck 符卡改造', () => {
     expect(s.invulnTime).toBeCloseTo(3.0, 5);
   });
 
-  it('破邪符卡给符卡加伤害', () => {
+  it('破邪符卡在默认伤害之上加 400', () => {
     const d = new Deck(new Rng(1), createStarterDeck());
     d.addPassive(getCard('p_spell_bane')!);
     const s = d.resolveSpell();
-    expect(s.damage).toBe(400);
+    // 默认 600 + 被动 400
+    expect(s.damage).toBe(1000);
   });
 });
 

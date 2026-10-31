@@ -192,14 +192,40 @@ describe('World 死亡暂停', () => {
     expect(w.enemies.length).toBe(0);
   });
 
-  it('续关保留得分与金钱', () => {
+  it('续关保留得分', () => {
+    const w = new World({ seed: 1 });
+    w.score = 1200;
+    killPlayer(w);
+    w.doContinue();
+    // 得分不受 MISS 影响
+    expect(w.score).toBe(1200);
+  });
+
+  it('续关本身不再扣钱（MISS 已扣过）', () => {
     const w = new World({ seed: 1 });
     w.score = 1200;
     w.coins = 340;
     killPlayer(w);
+
+    // 死亡过程中每次 MISS 扣 40%，3 次残机扣完后剩多少就是多少
+    const afterDeath = w.coins;
+
     w.doContinue();
-    expect(w.score).toBe(1200);
-    expect(w.coins).toBe(340);
+
+    // 续关这个动作本身不改变剩余金额
+    expect(w.coins).toBe(afterDeath);
+  });
+
+  it('每次 MISS 扣掉 40% 蜃銭', () => {
+    const w = new World({ seed: 1 });
+    w.coins = 1000;
+    w.player.lives = 1;
+
+    killPlayer(w);
+
+    // 一次 MISS：1000 扣 40% = 600
+    // （掉落物因拾取冷却未被立刻捡回）
+    expect(w.coins).toBeCloseTo(600, -1);
   });
 
   it('续关后给足无敌时间', () => {

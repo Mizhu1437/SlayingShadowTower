@@ -34,6 +34,58 @@ export interface WorldConfig {
   seed: number;
 }
 
+/**
+ * MISS 惩罚参数（用户 2026-10-31 定稿）。
+ *
+ * 经济设计的核心：损失 40%，但爆出的一半可以捡回（= 总额 20%）。
+ *   - 不捡：实际损失 40%，痛
+ *   - 冲回去捡：实际损失 20%，但有迎着弹幕的风险
+ * 这让"捡钱"本身成为一个风险决策。
+ */
+export const MISS_CONFIG = {
+  /** 损失蜃銭的比例 */
+  coinLossRatio: 0.4,
+  /** 爆出的蜃銭占损失量的比例 */
+  coinDropRatio: 0.5,
+  /** MISS 后的无敌时间（秒） */
+  invulnTime: 3.0,
+  /** 重置位置周围清空敌人的半径（避免落地即死） */
+  spawnClearRadius: 200,
+  /** 单次最多爆出几个金币物件 */
+  maxCoinDrops: 12,
+  /** 金币物件的存活时间（秒） */
+  coinDropLife: 8,
+  /** 自机吸引金币的半径 */
+  coinAttractRadius: 60,
+  /** 吸引速度（像素/秒） */
+  coinAttractSpeed: 260,
+  /** 拾取判定半径 */
+  coinPickRadius: 14,
+  /** 刚爆出后多久才可拾取（秒），让金币先散开 */
+  coinPickupDelay: 0.6,
+} as const;
+
+/** 掉落的蜃銭 */
+export interface CoinDrop {
+  x: number;
+  y: number;
+  amount: number;
+  vx: number;
+  vy: number;
+  /** 剩余存活时间 */
+  life: number;
+  collected: boolean;
+  /**
+   * 刚爆出时的拾取冷却（秒）。
+   *
+   * 为什么需要：MISS 时自机重置点可能离撞弹点不远，
+   * 若掉落物一生成就能捡，钱会在玩家看清之前被吸走 ——
+   * 玩家只会感到"钱莫名其妙少了"，而看不到"爆出了一堆钱"。
+   * 给 0.6 秒让金币先散开，之后才允许拾取。
+   */
+  pickupDelay: number;
+}
+
 interface SpawnRequest {
   cfg: EnemyConfig;
   x: number;
@@ -601,6 +653,9 @@ export class World {
     // 8. 敌弹 vs 自机
     this.resolvePlayerHits();
 
+    // 8.5 蜃銭掉落物：飘动、吸引、拾取
+    this.stepCoinDrops();
+
     // 9. 清理已消散的敌人
     this.cleanupEnemies();
   }
@@ -645,6 +700,16 @@ export class World {
 
   /** 敌弹 vs 自机：只判定圆心距离，判定半径极小 */
   private resolvePlayerHits(): void {
+    // 符卡生效期间自机必定无敌。
+    //
+    // 为什么要在守卫里额外判一次 spell.phase：
+    //   中弹判定原本只看 player.invuln，而符卡的无敌期是
+    //   SpellSystem 的 active 状态 —— 两个独立状态源。
+    //   如果它们不同步（例如代码里手动改 invuln，或将来某个卡牌效果），
+    //   就会出现"通过守卫 -> enterDeathbomb 因 active 而拒绝 ->
+    //   兜底条件也不成立"的漏洞，中弹被静默吞掉。
+    //   这道守卫让两者含义一致：符卡生效 = 打不到。
+    if (this.spell.phase === 'active') return;
     if (!this.player.vulnerable) return;
 
     const px = this.player.x;
@@ -688,15 +753,150 @@ export class World {
   }
 
   /** 扣残机、重置符卡、检查是否进入死亡流程 */
+  /**
+   * MISS 处理（撞弹且决死失败）。
+   *
+   * 用户 2026-10-31 明确的完整规则：
+   *   1. 自机重置到初始位置
+   *   2. 损失 40% 蜃銭
+   *   3. 在撞弹位置爆出「损失量的一半」蜃銭（类比原作的 P 点爆出）
+   *   4. 获得一段时间的无敌
+   *   5. 失去一张残机、符卡重置（正作规则）
+   *
+   * 关于第 2、3 条的经济设计：
+   *   损失 40%，但可以在原地捡回其中一半（= 总额的 20%），
+   *   所以"立刻冲回去捡"能把实际损失从 40% 压到 20%。
+   *   这让 MISS 同时惩罚操作失误与奖励风险决策 —— 捡钱要迎着弹幕冲。
+   */
   private applyMiss(): void {
+    // 记录撞弹位置（重置前）
+    const hitX = this.player.x;
+    const hitY = this.player.y;
+
     const took = this.player.hit();
     if (!took) return;
 
-    // 正作规则：失去残机时符卡重置为初始数量
+    // ── 1. 损失 40% 蜃銭，并在撞弹处爆出一半 ──
+    const lost = Math.floor(this.coins * MISS_CONFIG.coinLossRatio);
+    if (lost > 0) {
+      this.coins -= lost;
+      const dropped = Math.floor(lost * MISS_CONFIG.coinDropRatio);
+      if (dropped > 0) {
+        this.spawnCoinDrop(hitX, hitY, dropped);
+      }
+    }
+
+    // ── 2. 自机重置到初始位置 ──
+    this.player.x = FIELD_W / 2;
+    this.player.y = FIELD_H * 0.82;
+
+    // ── 3. 一段时间无敌 ──
+    this.player.invuln = Math.max(this.player.invuln, MISS_CONFIG.invulnTime);
+
+    // ── 4. 正作规则：失去残机时符卡重置为初始数量 ──
     this.spell.onPlayerMiss();
+
+    // ── 5. 清掉出生点附近的敌人，避免落地即死 ──
+    this.clearNearbyEnemies(this.player.x, this.player.y, MISS_CONFIG.spawnClearRadius);
 
     // 残机耗尽 → 暂停游戏，等待玩家选择是否续关
     if (this.player.dead) this.flow.onPlayerDead();
+  }
+
+  /**
+   * 在指定位置生成一堆可拾取的蜃銭。
+   *
+   * 用「一簇多个小金币」而不是单个大金币：
+   * 撒开的形状让玩家能看清哪里掉了钱，视觉上更像原作爆出的 P 点。
+   */
+  private spawnCoinDrop(x: number, y: number, totalAmount: number): void {
+    const n = Math.min(MISS_CONFIG.maxCoinDrops, Math.max(3, Math.ceil(totalAmount / 8)));
+    const per = Math.max(1, Math.floor(totalAmount / n));
+
+    for (let i = 0; i < n; i++) {
+      // 以撞弹点为中心的圆形散开
+      const angle = (Math.PI * 2 * i) / n + this.rng.next() * 0.6;
+      const dist = 8 + this.rng.next() * 26;
+      this.coinDrops.push({
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist,
+        amount: per,
+        vx: Math.cos(angle) * 40,
+        vy: Math.sin(angle) * 40 - 30,
+        life: MISS_CONFIG.coinDropLife,
+        collected: false,
+        pickupDelay: MISS_CONFIG.coinPickupDelay,
+      });
+    }
+  }
+
+  /** 清掉半径内的敌人（MISS 复活保护） */
+  private clearNearbyEnemies(x: number, y: number, radius: number): void {
+    const r2 = radius * radius;
+    for (const e of this.enemies) {
+      if (!e.targetable) continue;
+      const dx = e.x - x;
+      const dy = e.y - y;
+      if (dx * dx + dy * dy <= r2) {
+        // 只清场，不给分不给钱（避免玩家故意自杀刷分）
+        e.dead = true;
+        e.fadeOut = 0.2;
+      }
+    }
+  }
+
+  /** 场上的蜃銭掉落物 */
+  readonly coinDrops: CoinDrop[] = [];
+
+  /**
+   * 推进掉落物：飘动、衰减、被自机吸引并拾取。
+   */
+  private stepCoinDrops(): void {
+    for (let i = this.coinDrops.length - 1; i >= 0; i--) {
+      const c = this.coinDrops[i]!;
+      if (c.collected) {
+        this.coinDrops.splice(i, 1);
+        continue;
+      }
+
+      // 惯性 + 阻尼
+      c.x += c.vx * LOGIC_DT;
+      c.y += c.vy * LOGIC_DT;
+      c.vx *= 0.94;
+      c.vy *= 0.94;
+
+      // 刚爆出时不可拾取，也不被吸引，让金币先散开
+      if (c.pickupDelay > 0) {
+        c.pickupDelay -= LOGIC_DT;
+        c.life -= LOGIC_DT;
+        if (c.life <= 0) this.coinDrops.splice(i, 1);
+        continue;
+      }
+
+      // 自机靠近时被吸引
+      const dx = this.player.x - c.x;
+      const dy = this.player.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      const attract = MISS_CONFIG.coinAttractRadius;
+      if (d2 < attract * attract) {
+        const d = Math.sqrt(d2) || 1;
+        const pull = MISS_CONFIG.coinAttractSpeed * LOGIC_DT;
+        c.x += (dx / d) * pull;
+        c.y += (dy / d) * pull;
+      }
+
+      // 拾取判定
+      if (d2 < MISS_CONFIG.coinPickRadius * MISS_CONFIG.coinPickRadius) {
+        this.coins += c.amount;
+        c.collected = true;
+        this.coinDrops.splice(i, 1);
+        continue;
+      }
+
+      // 超时消失
+      c.life -= LOGIC_DT;
+      if (c.life <= 0) this.coinDrops.splice(i, 1);
+    }
   }
 
   /**
@@ -793,6 +993,7 @@ export class World {
     this.player.reset(FIELD_W / 2, FIELD_H * 0.82);
     this.cardShots.clear();
     this.enemyBullets.clear();
+    this.coinDrops.length = 0;
     this.enemies.length = 0;
     this.pendingSpawns.length = 0;
     this.score = 0;

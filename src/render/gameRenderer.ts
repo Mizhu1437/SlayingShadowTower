@@ -16,6 +16,7 @@ const COLORS = {
   shotOrb: 0xffd98a,
   shotTalisman: 0xc79bff,
   fireCore: 0xfff2b0,
+  coin: 0xffd479,
   fireMid: 0xffa63d,
   fireEdge: 0xff4d2e,
   enemy: 0xff6b8a,
@@ -40,6 +41,9 @@ export class GameRenderer {
   private readonly shotTalismanGfx: Graphics[] = [];
   /** 火鸟：每枚由多个 Graphics 组成的容器 */
   private readonly firebirdGfx: Container[] = [];
+  /** 蜃銭掉落物 */
+  private readonly coinGfx: Graphics[] = [];
+  private readonly COIN_CAP = 64;
   private readonly FIREBIRD_CAP = 32;
 
   private enemyGfx: Graphics[] = [];
@@ -89,6 +93,7 @@ export class GameRenderer {
     this.root.addChild(this.shotLayer, this.enemyLayer, this.bulletLayer, this.playerLayer);
 
     this.buildShotPool();
+    this.buildCoinPool();
     this.buildBulletPool();
     this.buildPlayer();
     this.buildHud();
@@ -174,6 +179,19 @@ export class GameRenderer {
       c.visible = false;
       this.firebirdGfx.push(c);
       this.shotLayer.addChild(c);
+    }
+  }
+
+  private buildCoinPool(): void {
+    for (let i = 0; i < this.COIN_CAP; i++) {
+      const g = new Graphics()
+        .circle(0, 0, 5)
+        .fill(COLORS.coin)
+        .circle(0, -1, 2)
+        .fill({ color: 0xfff6cf, alpha: 0.85 });
+      g.visible = false;
+      this.coinGfx.push(g);
+      this.shotLayer.addChild(g);
     }
   }
 
@@ -279,6 +297,7 @@ export class GameRenderer {
   render(world: World): void {
     this.renderPlayer(world);
     this.renderShots(world);
+    this.renderCoinDrops(world);
     this.renderEnemies(world);
     this.renderBullets(world);
     this.renderBombFlash(world);
@@ -345,6 +364,29 @@ export class GameRenderer {
     } else {
       pc.alpha = p.dead ? 0 : 1;
       this.playerInvulnRing.visible = false;
+    }
+  }
+
+  /** 蜃銭掉落物 */
+  private renderCoinDrops(world: World): void {
+    const drops = world.coinDrops;
+    const n = Math.min(drops.length, this.coinGfx.length);
+
+    const t = performance.now() / 260;
+    for (let i = 0; i < n; i++) {
+      const d = drops[i]!;
+      const g = this.coinGfx[i]!;
+      g.visible = true;
+      g.position.set(d.x, d.y);
+      // 呼吸式闪动，提示可以捡
+      const pulse = 1 + 0.18 * Math.sin(t + i * 1.3);
+      g.scale.set(pulse);
+      // 快消失时变淡
+      g.alpha = d.life < 2 ? 0.35 + 0.35 * Math.sin(t * 4 + i) : 1;
+    }
+
+    for (let i = n; i < this.coinGfx.length; i++) {
+      this.coinGfx[i]!.visible = false;
     }
   }
 
