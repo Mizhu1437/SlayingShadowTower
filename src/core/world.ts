@@ -56,9 +56,22 @@ export const MISS_CONFIG = {
   /** 金币物件的存活时间（秒） */
   coinDropLife: 8,
   /** 自机吸引金币的半径 */
-  coinAttractRadius: 60,
-  /** 吸引速度（像素/秒） */
-  coinAttractSpeed: 260,
+  coinAttractRadius: 90,
+  /**
+   * 吸引速度（像素/秒）。
+   *
+   * 必须显著快于自机移动速度（高速 300），否则自机跑得比金币快，
+   * 会一路拖着金币走 —— 视觉上就是"钱拖尾"。
+   * 取 900 = 3 倍高速，金币总能追上自机。
+   */
+  coinAttractSpeed: 900,
+  /**
+   * 自动收点：自机进入距版顶这个比例以内时，全屏金币都被吸引。
+   *
+   * 对应东方正作的「上收点」—— 冲到上方可以一口气收完所有掉落物。
+   * 它给了玩家一个"冒险上冲"的理由，也让清场后能快速结算。
+   */
+  autoCollectTopRatio: 0.25,
   /** 拾取判定半径 */
   coinPickRadius: 14,
   /** 刚爆出后多久才可拾取（秒），让金币先散开 */
@@ -911,14 +924,26 @@ export class World {
         continue;
       }
 
-      // ── 自机靠近时被吸引 ──
+      // ── 吸引与拾取 ──
       const dx = this.player.x - c.x;
       const dy = this.player.y - c.y;
       const d2 = dx * dx + dy * dy;
+
+      // 自动收点：自机冲到场地上部时，全屏金币都被吸过来
+      // （对应正作的「上收点」）
+      const autoCollecting = this.player.y < FIELD_H * MISS_CONFIG.autoCollectTopRatio;
+
       const attract = MISS_CONFIG.coinAttractRadius;
-      if (d2 < attract * attract) {
+      if (autoCollecting || d2 < attract * attract) {
         const d = Math.sqrt(d2) || 1;
-        const pull = MISS_CONFIG.coinAttractSpeed * LOGIC_DT;
+
+        // 距离越近吸得越快（指数逼近），避免"匀速追不上"
+        // 在极近距离时不会因速度过大而越过目标点
+        const speed = autoCollecting
+          ? MISS_CONFIG.coinAttractSpeed * 1.6   // 上收点时更快
+          : MISS_CONFIG.coinAttractSpeed;
+        const pull = Math.min(speed * LOGIC_DT, d);
+
         c.x += (dx / d) * pull;
         c.y += (dy / d) * pull;
       }
