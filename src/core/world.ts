@@ -74,8 +74,7 @@ export const MISS_CONFIG = {
    * 反而让"捡钱"变成碰运气。
    */
   coinFallSpeed: 70,
-  /** 横向漂移速度上限（像素/秒），形成轻微的散开感 */
-  coinDriftSpeed: 26,
+/** 说明：兑换物无横向速度，纯竖直匀速下落 */
 } as const;
 
 /** 掉落的蜃銭 */
@@ -846,9 +845,9 @@ export class World {
         x: x + Math.cos(angle) * dist,
         y: y + Math.sin(angle) * dist,
         amount: per,
-        // 横向轻微散开，竖直方向不设初速度 —— 下落由匀速逻辑统一驱动
-        vx: Math.cos(angle) * (MISS_CONFIG.coinDriftSpeed
-          * (0.4 + this.rng.next() * 0.6)),
+        // 纯竖直下落：无竖直初速度，也无横向速度。
+        // 位置上的散开由下面的 x 偏移决定，不靠速度实现。
+        vx: 0,
         vy: 0,
         life: MISS_CONFIG.coinDropLife,
         collected: false,
@@ -894,20 +893,11 @@ export class World {
         continue;
       }
 
-      // ── 匀速下落 ──
-      // vy 在生成时已定为 coinFallSpeed，这里不再累加重力
-      c.x += c.vx * LOGIC_DT;
+      // ── 纯竖直匀速下落 ──
+      // 横向位置完全不变：金币落下后只沿 y 轴移动。
+      // 如果保留横向速度，金币会斜着飘 —— 那既不是经典 STG 的手感，
+      // 也让玩家难以预判落点。散开效果改由生成时的 x 偏移实现。
       c.y += MISS_CONFIG.coinFallSpeed * LOGIC_DT;
-
-      // 横向轻微摆动，看起来不死板；碰壁则反向
-      c.vx *= 0.995;
-      if (c.x < 6) {
-        c.x = 6;
-        c.vx = Math.abs(c.vx) * 0.6;
-      } else if (c.x > FIELD_W - 6) {
-        c.x = FIELD_W - 6;
-        c.vx = -Math.abs(c.vx) * 0.6;
-      }
 
       // ── 落出底部即消失 ──
       if (c.y > FIELD_H + 10) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { World, MISS_CONFIG, FIELD_W, FIELD_H } from '../../src/core/world';
+import { World, MISS_CONFIG, FIELD_H } from '../../src/core/world';
 
 /** 造一个掉落物 */
 function makeDrop(x: number, y: number, amount = 10, vx = 0) {
@@ -73,19 +73,19 @@ describe('蜃銭掉落物：匀速下落', () => {
     }
   });
 
-  it('横向不会飞出场地', () => {
+  it('下落过程中横向位置完全不变', () => {
     const w = new World({ seed: 1 });
     w.startAct(0);
 
-    w.coinDrops.push(makeDrop(10, 60, 10, -400));
-    w.coinDrops.push(makeDrop(FIELD_W - 10, 60, 10, 400));
+    w.coinDrops.push(makeDrop(123, 60));
 
-    for (let i = 0; i < 60; i++) w.step();
-
-    for (const d of w.coinDrops) {
-      if (d.collected) continue;
-      expect(d.x).toBeGreaterThanOrEqual(0);
-      expect(d.x).toBeLessThanOrEqual(FIELD_W);
+    const x0 = w.coinDrops[0]!.x;
+    for (let i = 0; i < 60; i++) {
+      w.step();
+      const d = w.coinDrops[0];
+      if (!d) break;
+      // 每一帧的 x 都必须与初始完全相同
+      expect(d.x).toBe(x0);
     }
   });
 
@@ -223,6 +223,24 @@ describe('MISS 掉钱也遵守匀速下落', () => {
     const alive = w.coinDrops[0];
     if (alive) {
       expect(alive.y).toBeGreaterThan(y0);
+    }
+  });
+
+  it('多枚金币各自竖直下落，横向互不影响', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+
+    const xs = [100, 150, 200];
+    for (const x of xs) w.coinDrops.push(makeDrop(x, 60));
+
+    for (let i = 0; i < 60; i++) w.step();
+
+    // 每个金币的 x 都应与生成时一致
+    const current = w.coinDrops.map((c) => c.x).sort((a, b) => a - b);
+    if (current.length === xs.length) {
+      for (let i = 0; i < xs.length; i++) {
+        expect(current[i]).toBe(xs[i]);
+      }
     }
   });
 });
