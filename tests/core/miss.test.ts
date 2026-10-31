@@ -264,27 +264,47 @@ describe('蜃銭掉落物：拾取', () => {
     expect(w.coinDrops.length).toBe(0);
   });
 
-  it('掉落物超时后消失', () => {
+  it('掉落物落出场地底部后消失', () => {
     const w = new World({ seed: 1 });
     w.startAct(0);
 
-    const farX = 10;
-    const farY = 10;
+    // 放在场地中部，远离自机（不会被捡）
     w.coinDrops.push({
-      x: farX,
-      y: farY,
+      x: 20,
+      y: 100,
       amount: 10,
       vx: 0,
       vy: 0,
-      life: 0.5,
+      life: 99,
       collected: false,
       pickupDelay: 0,
     });
 
-    // 跑 1 秒
-    for (let i = 0; i < 70; i++) w.step();
+    // 以 70 px/s 匀速下落，(448-100)/70 ≈ 5 秒后离开
+    for (let i = 0; i < 400; i++) w.step();
 
     expect(w.coinDrops.length).toBe(0);
+  });
+
+  it('掉落物在落出前一直存在（不会超时消失）', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+
+    w.coinDrops.push({
+      x: 20,
+      y: 100,
+      amount: 10,
+      vx: 0,
+      vy: 0,
+      life: 0.1,      // 旧的超时值，现在应该被忽略
+      collected: false,
+      pickupDelay: 0,
+    });
+
+    // 跑 1 秒，位置还远未到底，应该还在
+    for (let i = 0; i < 60; i++) w.step();
+
+    expect(w.coinDrops.length).toBe(1);
   });
 
   it('多个掉落物可以全部捡起', () => {

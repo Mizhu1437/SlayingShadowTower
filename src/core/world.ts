@@ -64,19 +64,18 @@ export const MISS_CONFIG = {
   /** 刚爆出后多久才可拾取（秒），让金币先散开 */
   coinPickupDelay: 0.6,
   /**
-   * 重力加速度（像素/秒²）。
+   * 下落速度（像素/秒）。
    *
-   * 金币要能"下落"：爆出时向上抛（负 vy），随后被重力拉下来，
-   * 最后落到底部停住。数值参考自机移动速度（300 px/s）：
-   * 让金币大约 0.6 秒落到屏幕下部，玩家有时间看清并冲过去。
+   * 匀速下落，不受重力影响 —— 这是经典 STG 掉落物的处理方式：
+   * 玩家能凭肉眼预判每个物品什么时候会掉出屏幕，
+   * 从而决定"先捡哪个、哪个放弃"。
+   *
+   * 若加重力，物品会越掉越快，落点难以预判，
+   * 反而让"捡钱"变成碰运气。
    */
-  coinGravity: 620,
-  /** 落地后的水平摩擦（每秒衰减比例） */
-  coinGroundFriction: 0.86,
-  /** 落地反弹系数（0 = 不弹，1 = 完全反弹） */
-  coinBounce: 0.32,
-  /** 落入场地底部时的 y 位置偏移 */
-  coinFloorOffset: 14,
+  coinFallSpeed: 70,
+  /** 横向漂移速度上限（像素/秒），形成轻微的散开感 */
+  coinDriftSpeed: 26,
 } as const;
 
 /** 掉落的蜃銭 */
@@ -847,9 +846,10 @@ export class World {
         x: x + Math.cos(angle) * dist,
         y: y + Math.sin(angle) * dist,
         amount: per,
-        // 向上抛 + 横向散开，之后由重力拉下来
-        vx: Math.cos(angle) * (55 + this.rng.next() * 45),
-        vy: Math.sin(angle) * 30 - (110 + this.rng.next() * 70),
+        // 横向轻微散开，竖直方向不设初速度 —— 下落由匀速逻辑统一驱动
+        vx: Math.cos(angle) * (MISS_CONFIG.coinDriftSpeed
+          * (0.4 + this.rng.next() * 0.6)),
+        vy: 0,
         life: MISS_CONFIG.coinDropLife,
         collected: false,
         pickupDelay: MISS_CONFIG.coinPickupDelay,
@@ -876,7 +876,15 @@ export class World {
   readonly coinDrops: CoinDrop[] = [];
 
   /**
-   * 推进掉落物：飘动、衰减、被自机吸引并拾取。
+   * 推进掉落物。
+   *
+   * 规则（经典 STG 做法）：
+   *   - 匀速下落，不受重力、不加速
+   *   - 落出场地底部即消失
+   *   - 自机靠近时被吸引过来，接触即拾取
+   *
+   * 为什么不用重力：加重力后物体越落越快，落点难以预判，
+   * 玩家没法规划"先捡哪个"。匀速下落才能让每一次取舍都是清晰决策。
    */
   private stepCoinDrops(): void {
     for (let i = this.coinDrops.length - 1; i >= 0; i--) {
@@ -886,43 +894,34 @@ export class World {
         continue;
       }
 
-      // ── 物理：重力下落 + 落地反弹 + 摩擦 ──
-      c.vy += MISS_CONFIG.coinGravity * LOGIC_DT;
-
+      // ── 匀速下落 ──
+      // vy 在生成时已定为 coinFallSpeed，这里不再累加重力
       c.x += c.vx * LOGIC_DT;
-      c.y += c.vy * LOGIC_DT;
+      c.y += MISS_CONFIG.coinFallSpeed * LOGIC_DT;
 
-      const floorY = FIELD_H - MISS_CONFIG.coinFloorOffset;
-      if (c.y >= floorY) {
-        // 触底：反弹一次，速度衰减
-        c.y = floorY;
-        if (Math.abs(c.vy) > 40) {
-          c.vy = -c.vy * MISS_CONFIG.coinBounce;
-        } else {
-          c.vy = 0;
-        }
-        // 地面摩擦
-        c.vx *= MISS_CONFIG.coinGroundFriction;
-      }
-
-      // 左右边界：碰壁反弹，避免钱飞出场地
+      // 横向轻微摆动，看起来不死板；碰壁则反向
+      c.vx *= 0.995;
       if (c.x < 6) {
         c.x = 6;
-        c.vx = Math.abs(c.vx) * 0.5;
+        c.vx = Math.abs(c.vx) * 0.6;
       } else if (c.x > FIELD_W - 6) {
         c.x = FIELD_W - 6;
-        c.vx = -Math.abs(c.vx) * 0.5;
+        c.vx = -Math.abs(c.vx) * 0.6;
       }
 
-      // 刚爆出时不可拾取，也不被吸引，让金币先散开
-      if (c.pickupDelay > 0) {
-        c.pickupDelay -= LOGIC_DT;
-        c.life -= LOGIC_DT;
-        if (c.life <= 0) this.coinDrops.splice(i, 1);
+      // ── 落出底部即消失 ──
+      if (c.y > FIELD_H + 10) {
+        this.coinDrops.splice(i, 1);
         continue;
       }
 
-      // 自机靠近时被吸引
+      // 刚爆出时不可拾取，让金币先散开
+      if (c.pickupDelay > 0) {
+        c.pickupDelay -= LOGIC_DT;
+        continue;
+      }
+
+      // ── 自机靠近时被吸引 ──
       const dx = this.player.x - c.x;
       const dy = this.player.y - c.y;
       const d2 = dx * dx + dy * dy;
@@ -934,17 +933,12 @@ export class World {
         c.y += (dy / d) * pull;
       }
 
-      // 拾取判定
+      // ── 拾取判定 ──
       if (d2 < MISS_CONFIG.coinPickRadius * MISS_CONFIG.coinPickRadius) {
         this.coins += c.amount;
         c.collected = true;
         this.coinDrops.splice(i, 1);
-        continue;
       }
-
-      // 超时消失
-      c.life -= LOGIC_DT;
-      if (c.life <= 0) this.coinDrops.splice(i, 1);
     }
   }
 
