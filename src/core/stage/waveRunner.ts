@@ -31,6 +31,16 @@ export class WaveRunner {
   private spawnedThisWave = 0;
   private hooks: RunnerHooks | null = null;
 
+  /**
+   * 在第 N 波打完后暂停（0 起，-1 表示不暂停）。
+   *
+   * 用途：第四幕的商店要插在道中 BOSS 之后、关底 BOSS 之前，
+   * 而不是整幕结束之后。波次运行器需要在中间停下来。
+   */
+  private pauseAfterWave = -1;
+  /** 是否已停在中间点 */
+  private pausedMidway = false;
+
   /** 总波数，供 UI 显示进度 */
   get totalWaves(): number {
     return this.stage?.waves.length ?? 0;
@@ -47,7 +57,9 @@ export class WaveRunner {
     return this.stage.waves[this.waveIndex] ?? null;
   }
 
-  start(stage: StageDef, hooks: RunnerHooks): void {
+  start(stage: StageDef, hooks: RunnerHooks, pauseAfterWave = -1): void {
+    this.pauseAfterWave = pauseAfterWave;
+    this.pausedMidway = false;
     this.stage = stage;
 
     this.hooks = hooks;
@@ -58,8 +70,24 @@ export class WaveRunner {
     this.phase = stage.waves.length > 0 ? 'running' : 'done';
   }
 
+  /** 是否停在中间点（等商店） */
+  get isPausedMidway(): boolean {
+    return this.pausedMidway;
+  }
+
+  /** 从中间暂停点恢复 */
+  resume(): void {
+    if (!this.pausedMidway) return;
+    this.pausedMidway = false;
+    this.phase = this.stage && this.waveIndex < this.stage.waves.length
+      ? 'running'
+      : 'done';
+  }
+
   reset(): void {
     this.phase = 'idle';
+    this.pauseAfterWave = -1;
+    this.pausedMidway = false;
     this.stage = null;
     this.hooks = null;
     this.waveIndex = 0;
@@ -128,6 +156,11 @@ export class WaveRunner {
 
     if (this.waveIndex >= this.stage.waves.length) {
       this.phase = 'done';
+    } else if (this.pauseAfterWave >= 0
+      && this.waveIndex === this.pauseAfterWave + 1) {
+      // 到了中间暂停点：停在 idle，等外部 resume
+      this.pausedMidway = true;
+      this.phase = 'idle';
     }
     return true;
   }

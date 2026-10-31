@@ -8,8 +8,9 @@
 
 export type GamePhase =
   | 'playing'   // 正常游玩
+  | 'shop'      // 幕间商店
   | 'dead'      // 残机耗尽，等待玩家选择是否续关
-  | 'cleared';  // 结算完成（P3 接入）
+  | 'cleared';  // 结算完成
 
 export interface ContinueState {
   phase: GamePhase;
@@ -39,9 +40,31 @@ export class GameFlow {
     return this.continueCount < this.maxContinues;
   }
 
-  /** 是否应该暂停推进逻辑（死亡时暂停） */
+  /** 是否应该暂停推进逻辑（非游玩阶段都暂停） */
   get paused(): boolean {
     return this.phase !== 'playing';
+  }
+
+  /** 是否处于商店阶段 */
+  get inShop(): boolean {
+    return this.phase === 'shop';
+  }
+
+  /**
+   * 进入商店（一幕打完时调用）。
+   * 只在 playing 阶段生效，避免重复进入。
+   */
+  enterShop(): boolean {
+    if (this.phase !== 'playing') return false;
+    this.phase = 'shop';
+    return true;
+  }
+
+  /** 离开商店，进入下一幕 */
+  leaveShop(): boolean {
+    if (this.phase !== 'shop') return false;
+    this.phase = 'playing';
+    return true;
   }
 
   /**

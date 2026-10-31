@@ -13,6 +13,7 @@ import { FixedStep } from './core/loop';
 import { Input } from './render/input';
 import { GameRenderer } from './render/gameRenderer';
 import { HandUI } from './ui/handUI';
+import { ShopUI } from './ui/shopUI';
 
 const SCALE = 1.6;
 
@@ -36,6 +37,34 @@ async function main() {
   const renderer = new GameRenderer(app, SCALE);
   const loop = new FixedStep();
   const handUI = new HandUI(document.getElementById('hand-area')!);
+
+  const shopUI = new ShopUI(document.body, {
+    onBuy: (index) => {
+      const r = world.buyShopItem(index);
+      if (!r.ok) {
+        // 钱不够或已售出，给个短暂提示
+        shopHint = r.reason === 'no_money' ? '蜃銭不足' : '无法购买';
+        shopHintTimer = 1.6;
+      }
+    },
+    onRemoveCard: (cardId) => {
+      world.completeRemoveCard(cardId);
+    },
+    onLeave: () => {
+      leaveShop();
+    },
+  });
+
+  let shopHint = '';
+  let shopHintTimer = 0;
+
+  /** 离开商店并进入下一幕；最后一幕则结算 */
+  function leaveShop(): void {
+    const advanced = world.leaveShopAndAdvance();
+    if (!advanced && world.phase === 'cleared') {
+      syncOverlay();
+    }
+  }
 
   // 启动第一幕
   if (!world.startAct(0)) {
@@ -111,7 +140,13 @@ async function main() {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (world.phase === 'dead') {
+    if (world.phase === 'shop') {
+      // 商店里 Enter 直接离开（删卡待选时先进效删卡，不离开）
+      if (e.key === 'Enter' && !world.pendingRemoveCard) {
+        leaveShop();
+        e.preventDefault();
+      }
+    } else if (world.phase === 'dead') {
       if (e.key === 'Enter') { btnContinue.click(); e.preventDefault(); }
       else if (e.key === 'Escape') { btnGiveUp.click(); e.preventDefault(); }
     } else if (world.phase === 'cleared') {
@@ -167,6 +202,35 @@ async function main() {
       wv.phase === 'running' ? `${wv.currentWave}/${wv.totalWaves}`
         : wv.phase === 'done' ? '完成'
           : '—';
+
+    // ── 幕间商店 ──
+    // 一幕打完后自动进入商店（只触发一次：enterShop 内部会拒绝重复进入）
+    if (world.phase === 'playing' && world.actCleared) {
+      world.enterShop();
+    }
+
+    if (shopHintTimer > 0) {
+      shopHintTimer -= realDt;
+      if (shopHintTimer <= 0) shopHint = '';
+    }
+
+    if (world.phase === 'shop') {
+      shopUI.show(
+        world.shop,
+        world.coins,
+        world.deck.pile.allCards(),
+        world.pendingRemoveCard,
+      );
+      if (shopHint) {
+        const hintEl = document.getElementById('shop-hint');
+        if (hintEl) {
+          hintEl.textContent = shopHint;
+          hintEl.classList.add('warn');
+        }
+      }
+    } else if (shopUI.isVisible) {
+      shopUI.hide();
+    }
 
     syncOverlay();
   });

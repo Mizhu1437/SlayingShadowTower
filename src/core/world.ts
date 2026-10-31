@@ -10,6 +10,7 @@
 import { Player, type InputState } from './player';
 import { CardShots } from './shot/cardShots';
 import { BURN_CONFIG } from './status';
+import { Shop } from './shop/shop';
 import { Enemy, type EnemyConfig } from './enemy';
 import { BulletField } from './danmaku/bulletField';
 import { SpatialGrid } from './danmaku/spatialGrid';
@@ -86,6 +87,12 @@ export class World {
 
   /** 波次运行器（P3） */
   readonly waves: WaveRunner = new WaveRunner();
+
+  /** 幕间商店 */
+  readonly shop: Shop = new Shop();
+
+  /** 已通过的幕数 */
+  actsCleared = 0;
 
   /** 本次运行使用的种子（供复现） */
   readonly seed: number;
@@ -175,6 +182,10 @@ export class World {
     // 每幕开局：满能量、重洗牌堆
     this.deck.resetForNewAct(createStarterDeck());
 
+    // 第四幕的商店插在道中BOSS 之后、关底BOSS 之前（DESIGN 4.1）
+    // 结构：1 精英 + 道中BOSS + 关底BOSS → 索引 0/1/2，道中BOSS 是第 1 波
+    const midwayPause = actIndex === 3 ? 1 : -1;
+
     this.waves.start(result.stage, {
       spawn: (typeId: string, nx: number, ny: number) => {
         const cfg = ENEMY_POOL[typeId];
@@ -195,7 +206,7 @@ export class World {
         this.spawnEnemy(cfg, px, py, restY);
       },
       aliveCount: () => this.aliveEnemyCount,
-    });
+    }, midwayPause);
 
     return true;
   }
@@ -261,6 +272,140 @@ export class World {
   get actCleared(): boolean {
     return this.waves.phase === 'done';
   }
+
+  /**
+   * 调试/测试用：立即结束本幕所有波次。
+   *
+   * 供自动化测试跳过实际战斗（玩家在测试里不操作会中弹身亡），
+   * 也供开发者快速验证幕间流程。生产环境不暴露给玩家。
+   */
+  debugClearAct(): void {
+    let guard = 0;
+    while (this.waves.phase !== 'done' && guard++ < 100) {
+      if (this.waves.isPausedMidway) {
+        // 中途商店点直接跳过（测试用）
+        this.waves.resume();
+        continue;
+      }
+      if (this.waves.phase === 'running') {
+        this.waves.step(9999);
+      } else {
+        break;
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // 幕间流程与商店
+  // ─────────────────────────────────────────────
+
+  /** 总幕数 */
+  static readonly TOTAL_ACTS = 4;
+
+  /**
+   * 本幕打完后进入商店。
+   * 返回是否成功进入（已经在商店或未打完时返回 false）。
+   */
+  enterShop(): boolean {
+    // 允许两种情况：整幕打完，或第四幕在道中BOSS 后中途暂停
+    const midway = this.waves.isPausedMidway;
+    if (!this.actCleared && !midway) return false;
+    if (!this.flow.enterShop()) return false;
+
+    this.shopAfterMidway = midway;
+
+    this.actsCleared = this.currentAct + 1;
+    this.shop.roll(
+      this.seed,
+      this.currentAct,
+      this.shop.state.visitCount,
+      this.shopPriceMul,
+    );
+    return true;
+  }
+
+  /**
+   * 离开商店，进入下一幕。
+   * 已是最后一幕时返回 false（应当走通关流程）。
+   */
+  leaveShopAndAdvance(): boolean {
+    if (!this.flow.leaveShop()) return false;
+
+    // 第四幕的中途商店：恢复波次，继续打关底BOSS
+    if (this.shopAfterMidway) {
+      this.shopAfterMidway = false;
+      this.waves.resume();
+      return true;
+    }
+
+    const next = this.currentAct + 1;
+    if (next >= World.TOTAL_ACTS) {
+      this.flow.phase = 'cleared';
+      return false;
+    }
+
+    this.startAct(next);
+    return true;
+  }
+
+  /**
+   * 购买商店里的第 index 件商品。
+   * 成功时扣除蜃銭并生效。
+   */
+  buyShopItem(index: number): { ok: boolean; reason?: string } {
+    const item = this.shop.state.items[index];
+    if (!item) return { ok: false, reason: 'no_item' };
+
+    const r = this.shop.buy(index, this.coins);
+    if (!r.ok) return { ok: false, reason: r.reason };
+
+    this.coins -= r.cost;
+
+    switch (item.kind) {
+      case 'card':
+        if (item.card) {
+          if (item.card.type === 'passive') {
+            this.deck.addPassive({ ...item.card });
+            this.refreshFromPassives();
+          } else {
+            this.deck.pile.addCard({ ...item.card });
+          }
+        }
+        break;
+      case 'heal_life':
+        this.player.lives++;
+        break;
+      case 'restore_spell':
+        this.spell.cards = Math.min(this.spell.cardsLimit, this.spell.cards + 1);
+        break;
+      case 'remove_card':
+        // 实际删卡由 UI 引导玩家选一张，这里只扣钱并标记
+        this.pendingRemoveCard = true;
+        break;
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * 完成删卡：把指定卡从牌组移除。
+   * 只有 pendingRemoveCard 为真时才有效。
+   */
+  completeRemoveCard(cardId: string): boolean {
+    if (!this.pendingRemoveCard) return false;
+    const ok = this.deck.pile.removeCardById(cardId);
+    if (ok) this.pendingRemoveCard = false;
+    return ok;
+  }
+
+  /** 是否正在等待玩家选择要删除的卡 */
+  pendingRemoveCard = false;
+
+  /** 难度导致的价格倍率（P4 接入难度表，现在固定 1） */
+  shopPriceMul = 1;
+
+  /** 本次商店是否是第四幕的中途商店（道中BOSS 后） */
+  shopAfterMidway = false;
 
   // ─────────────────────────────────────────────
   // 卡牌效果

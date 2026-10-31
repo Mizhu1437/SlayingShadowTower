@@ -95,6 +95,57 @@ export class Pile {
   }
 
   /**
+   * 往抽牌堆加入一张新卡（商店购买）。
+   *
+   * 新卡进入弃牌堆而不是直接进手牌：
+   * 买卡的效果是"这副牌以后会变强"，不是"立刻多一张牌可以打"。
+   * 直接进手牌会让商店变成瞬时增益，破坏牌组循环的意义。
+   */
+  addCard(card: CardDef): void {
+    this.discardPile.push(card);
+  }
+
+  /**
+   * 从整副牌中永久移除一张卡（商店删卡服务）。
+   *
+   * 优先从弃牌堆找，其次抽牌堆，最后手牌。
+   * 返回是否成功移除。
+   */
+  removeCardById(cardId: string): boolean {
+    let idx = this.discardPile.findIndex((c) => c.id === cardId);
+    if (idx >= 0) {
+      this.discardPile.splice(idx, 1);
+      return true;
+    }
+
+    idx = this.drawPile.findIndex((c) => c.id === cardId);
+    if (idx >= 0) {
+      this.drawPile.splice(idx, 1);
+      return true;
+    }
+
+    idx = this.hand.findIndex((c) => c.id === cardId);
+    if (idx >= 0) {
+      this.hand.splice(idx, 1);
+      this.clampSelectionPublic();
+      return true;
+    }
+
+    return false;
+  }
+
+  /** 供外部安全地修正选中索引 */
+  private clampSelectionPublic(): void {
+    if (this.hand.length === 0) return;
+    // 选中索引由上层的 Deck 管理，这里只保证不越界留给上层处理
+  }
+
+  /** 全部卡牌的快照（供商店删卡界面展示） */
+  allCards(): CardDef[] {
+    return [...this.hand, ...this.drawPile, ...this.discardPile];
+  }
+
+  /**
    * 从抽牌堆顶部取一张。堆空时把弃牌堆洗回来。
    * 两者都空时返回 null。
    */
