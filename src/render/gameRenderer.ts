@@ -207,14 +207,18 @@ export class GameRenderer {
   private buildPlayer(): void {
     // 外圈光晕
     const halo = new Graphics().circle(0, 0, 9).fill({ color: COLORS.player, alpha: 0.28 });
-    // 本体
+    // 本体（实心圆，不带白色核心）
+    //
+    // 为什么去掉白核心：自机本体原来中心有个半径 2 的白点，
+    // 而判定点半径是 2.6，两者几乎一样大。
+    // 结果高速状态下玩家会误以为"判定点一直显示着"，
+    // 反而失去了"按住 Shift 才能确认判定位置"的信号意义。
+    // 判定点必须是低速时唯一出现的那个点。
     const body = new Graphics().circle(0, 0, 5).fill(COLORS.player);
-    // 核心白点
-    const core = new Graphics().circle(0, 0, 2).fill(COLORS.playerCore);
 
     this.playerGfx = new Container() as unknown as Graphics;
     const pc = this.playerGfx as unknown as Container;
-    pc.addChild(halo, body, core);
+    pc.addChild(halo, body);
 
     // 判定点（低速时显示）
     //
@@ -245,7 +249,13 @@ export class GameRenderer {
       .stroke({ width: 1, color: 0xff3b5c, alpha: 0.28 });
     this.deathbombRing.visible = false;
 
-    this.playerLayer.addChild(this.hitboxGfx, pc);
+    // 添加顺序即渲染层级（后加的在上层）。
+    //
+    // 判定点必须在自机本体**之后**添加，否则会被自机盖住看不见 ——
+    // 这正是之前"按住 Shift 却看不到判定点"的原因。
+    // 但它又要在无敌环与决死环之下，避免挡住那些提示。
+    this.playerLayer.addChild(pc);
+    this.playerLayer.addChild(this.hitboxGfx);
     this.playerLayer.addChild(this.playerInvulnRing);
     this.playerLayer.addChild(this.deathbombRing);
 

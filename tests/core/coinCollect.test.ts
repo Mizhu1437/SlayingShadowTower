@@ -133,6 +133,29 @@ describe('自动收点：自机冲到场地上部', () => {
   });
 });
 
+describe('吸取半径：不能太大', () => {
+  it('吸取半径应明显小于场地宽度', () => {
+    // 半径过大会让"拾取"退化成自动收，玩家感受不到要去接
+    expect(MISS_CONFIG.coinAttractRadius).toBeLessThan(FIELD_H * 0.12);
+  });
+
+  it('半径外的金币不会被吸走', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.coins = 0;
+
+    // 自机在中部，金币放在 2 倍吸引半径外
+    w.player.y = FIELD_H * 0.8;
+    const far = MISS_CONFIG.coinAttractRadius * 2.2;
+    w.coinDrops.push(makeDrop(w.player.x + far, w.player.y, 20));
+
+    // 跑几帧，金币会下落但仍不该被吸
+    for (let i = 0; i < 10; i++) w.step();
+
+    expect(w.coins).toBe(0);
+  });
+});
+
 describe('判定点只在低速时可见', () => {
   it('focusing 由输入决定', () => {
     const w = new World({ seed: 1 });
