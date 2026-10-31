@@ -217,12 +217,15 @@ export class GameRenderer {
     pc.addChild(halo, body, core);
 
     // 判定点（低速时显示）
+    //
+    // 只画一个实心小圆，不画外圈。
+    // 外圈会让人以为"圈的边缘才是判定边界"，从而误判自己的位置。
+    // 判定点的作用恰恰是告诉玩家"你实际只有这么小一点"，
+    // 所以视觉上必须是一个干净的点。
     this.hitboxGfx = new Graphics();
     this.hitboxGfx
-      .circle(0, 0, 3.2)
-      .fill({ color: COLORS.hitbox, alpha: 0.95 })
-      .circle(0, 0, 5.6)
-      .stroke({ width: 1, color: 0xffffff, alpha: 0.85 });
+      .circle(0, 0, 2.6)
+      .fill({ color: 0xffffff, alpha: 1 });
     this.hitboxGfx.visible = false;
 
     // 无敌闪烁环

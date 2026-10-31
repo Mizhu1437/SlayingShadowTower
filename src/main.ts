@@ -79,6 +79,7 @@ async function main() {
   const hudFps = document.getElementById('fps')!;
   const hudSpell = document.getElementById('spell')!;
   const hudWave = document.getElementById('wave')!;
+  const hudAct = document.getElementById('act')!;
 
   // ---------- 续关 / 结算面板 ----------
   const overlay = document.getElementById('overlay')!;
@@ -198,10 +199,12 @@ async function main() {
     hudSpell.textContent = String(world.spell.cards);
 
     const wv = world.waves;
+    const actNames = ['一', '二', '三', '四'];
+    hudAct.textContent = actNames[world.currentAct] ?? String(world.currentAct + 1);
     hudWave.textContent =
       wv.phase === 'running' ? `${wv.currentWave}/${wv.totalWaves}`
         : wv.phase === 'done' ? '完成'
-          : '—';
+          : wv.isPausedMidway ? '整备' : '—';
 
     // ── 幕间商店 ──
     // 一幕打完后自动进入商店（只触发一次：enterShop 内部会拒绝重复进入）

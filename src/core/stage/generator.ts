@@ -92,9 +92,14 @@ function genWave(
     kind: slot.kind,
     spawns,
     duration: slot.duration,
-    clearOn: slot.kind === 'boss' || slot.kind === 'midboss'
-      ? 'timeout'
-      : 'either',
+    // 所有波次统一用 either（全灭 或 到时）。
+    //
+    // 早期 BOSS 波用 timeout，理由是"BOSS 战要打满时长"。
+    // 但实测发现：BOSS 被秒杀后玩家仍要干等 40 / 120 秒，
+    // 看起来就像游戏卡住了。统一成 either 后：
+    //   打死了 -> 立刻进下一波
+    //   打不动 -> 按时推进，不卡关
+    clearOn: 'either',
   };
 }
 

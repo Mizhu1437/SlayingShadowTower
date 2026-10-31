@@ -81,7 +81,8 @@ describe('波次生成：结构固定，内容随机', () => {
     for (const b of bosses) {
       expect(b.spawns.length).toBe(1);
       expect(b.spawns[0]!.x).toBeCloseTo(0.5, 2);
-      expect(b.clearOn).toBe('timeout');
+      // BOSS 波也用 either：打死立刻推进，打不动按时推进
+      expect(b.clearOn).toBe('either');
     }
   });
 
@@ -352,6 +353,48 @@ describe('WaveRunner 推进', () => {
     // duration*2 = 1 秒后应强制推进
     for (let i = 0; i < 80; i++) runner.step(0.016);
     expect(runner.currentWave).toBe(2);
+  });
+
+
+  it('BOSS 被打死后立刻推进，不用等到时长结束', () => {
+    // 回归：早期 BOSS 波用 timeout，秒杀后仍要干等 40/120 秒，
+    // 玩家会以为游戏卡住了。
+    const { runner, hooks, killAll } = makeRunner();
+    const stage = {
+      actId: 'act1',
+      waves: [
+        {
+          id: 'w0', kind: 'boss' as const,
+          spawns: [{ typeId: 'boss_placeholder', x: 0.5, y: -0.1, delay: 0 }],
+          duration: 120, clearOn: 'either' as const,
+        },
+        {
+          id: 'w1', kind: 'normal' as const,
+          spawns: [{ typeId: 'grunt', x: 0.5, y: -0.1, delay: 0 }],
+          duration: 8, clearOn: 'either' as const,
+        },
+      ],
+    };
+    runner.start(stage, hooks);
+
+    // 生成 BOSS 后立即击杀
+    runner.step(0.016);
+    killAll();
+    runner.step(0.016);
+
+    // 应该立刻进入第 2 波，而不是等 120 秒
+    expect(runner.currentWave).toBe(2);
+  });
+
+  it('整幕的波次都有明确的推进条件（不会永久卡住）', () => {
+    const r = generateStage({
+      masterSeed: 42, actIndex: 0, pool: ENEMY_POOL, structure: STRUCT_3,
+    });
+    for (const w of r.stage.waves) {
+      // 所有波都必须能在"敌人打不死"的情况下按时推进
+      expect(['either', 'timeout']).toContain(w.clearOn);
+      expect(w.duration).toBeGreaterThan(0);
+    }
   });
 
   it('未启动时 step 不崩溃', () => {
