@@ -20,6 +20,7 @@ import { LOGIC_DT } from './loop';
 import { GameFlow, type GamePhase } from './flow';
 import { SpellSystem } from './spell/spellSystem';
 import { Deck, type CardPower } from './cards/deck';
+import type { CardDef } from './cards/def';
 import { createStarterDeck } from './cards/library';
 import { executeEffects, type EffectContext } from './cards/effects';
 import { WaveRunner } from './stage/waveRunner';
@@ -437,6 +438,47 @@ export class World {
       const r = this.deck.drawNow(1);
       if (r.drawn === 0 && !r.overloaded) break;
     }
+  }
+
+  /**
+   * 调试用：抽指定张数的牌。
+   *
+   * 走的是正式的 drawNow，所以会正常触发过载规则
+   * （满手时抽牌会弃全部重抽）。这是有意为之：
+   * 用控制台测过载时行为必须与真实一致。
+   */
+  debugDraw(n: number): { drawn: number; overloaded: boolean } {
+    const count = Math.max(1, Math.floor(n));
+    const r = this.deck.drawNow(count);
+    return { drawn: r.drawn, overloaded: r.overloaded };
+  }
+
+  /**
+   * 调试用：弃掉指定位置的牌。
+   *
+   * @param index 手牌索引（0 起）。省略时弃第 0 张。
+   *
+   * 弃牌 = 从手牌移除并进入弃牌堆，与打出卡牌的归处一致，
+   * 所以复用 pile.playAt —— 它本来就是"移出手牌 + 进弃牌堆"。
+   */
+  debugDiscard(index = 0): CardDef | null {
+    const hand = this.deck.pile.hand;
+    if (hand.length === 0) return null;
+    const i = Math.max(0, Math.min(index, hand.length - 1));
+    const card = this.deck.pile.playAt(i);
+    this.deck.clampSelection();
+    return card;
+  }
+
+  /** 调试用：弃掉整手牌 */
+  debugDiscardAll(): number {
+    const n = this.deck.pile.handSize;
+    let guard = 0;
+    while (this.deck.pile.handSize > 0 && guard++ < 20) {
+      this.deck.pile.playAt(0);
+    }
+    this.deck.clampSelection();
+    return n;
   }
 
   /**

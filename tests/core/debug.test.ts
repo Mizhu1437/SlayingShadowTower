@@ -267,4 +267,158 @@ describe('调试：状态下不影响正常流程', () => {
 
     expect(w.player.y).toBeLessThanOrEqual(FIELD_H);
   });
+
+describe('调试：抽牌', () => {
+  it('抽 1 张手牌 +1', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const before = w.deck.pile.handSize;
+
+    const r = w.debugDraw(1);
+    expect(r.drawn).toBe(1);
+    expect(w.deck.pile.handSize).toBe(before + 1);
+  });
+
+  it('一次抽多张', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const before = w.deck.pile.handSize;
+
+    const r = w.debugDraw(2);
+    expect(r.drawn).toBe(2);
+    expect(w.deck.pile.handSize).toBe(before + 2);
+  });
+
+  it('抽牌走正式规则：满手时会触发过载', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+
+    // 先补满
+    w.debugFillHand();
+    const U = w.deck.pile.cfg.upper;
+    expect(w.deck.pile.handSize).toBe(U);
+
+    const r = w.debugDraw(1);
+    expect(r.overloaded).toBe(true);
+    // 过载后手牌回到初始张数附近
+    expect(w.deck.pile.handSize).toBeLessThanOrEqual(U);
+  });
+
+  it('张数小于 1 时按 1 处理', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const before = w.deck.pile.handSize;
+    w.debugDraw(0);
+    expect(w.deck.pile.handSize).toBe(before + 1);
+  });
+
+  it('牌堆总数守恒', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const total = w.deck.pile.totalCards;
+
+    w.debugDraw(3);
+    expect(w.deck.pile.totalCards).toBe(total);
+  });
+});
+
+describe('调试：弃牌', () => {
+  it('弃第 1 张：手牌 -1，弃牌堆 +1', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const handBefore = w.deck.pile.handSize;
+    const discardBefore = w.deck.pile.discardCount;
+
+    const card = w.debugDiscard(0);
+    expect(card).not.toBeNull();
+    expect(w.deck.pile.handSize).toBe(handBefore - 1);
+    expect(w.deck.pile.discardCount).toBe(discardBefore + 1);
+  });
+
+  it('弃指定位置的牌，返回的正是那张', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.debugFillHand();
+
+    const target = w.deck.pile.hand[2];
+    const card = w.debugDiscard(2);
+    expect(card?.id).toBe(target?.id);
+  });
+
+  it('位置越界时夹到最后一第', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const n = w.deck.pile.handSize;
+
+    const card = w.debugDiscard(999);
+    expect(card).not.toBeNull();
+    expect(w.deck.pile.handSize).toBe(n - 1);
+  });
+
+  it('手牌为空时返回 null', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.debugDiscardAll();
+    expect(w.deck.pile.handSize).toBe(0);
+    expect(w.debugDiscard(0)).toBeNull();
+  });
+
+  it('弃掉整手牌', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const n = w.debugDiscardAll();
+    expect(n).toBeGreaterThan(0);
+    expect(w.deck.pile.handSize).toBe(0);
+  });
+
+  it('弃牌总数守恒（弃的牌进弃牌堆，不消失）', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const total = w.deck.pile.totalCards;
+
+    w.debugDiscardAll();
+    expect(w.deck.pile.totalCards).toBe(total);
+  });
+
+  it('弃牌后选中索引不越界', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.deck.selected = w.deck.pile.handSize - 1;
+
+    w.debugDiscard(0);
+    expect(w.deck.selected).toBeLessThan(Math.max(1, w.deck.pile.handSize));
+  });
+
+  it('连续弃牌不会崩溃', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    for (let i = 0; i < 20; i++) w.debugDiscard(0);
+    expect(w.deck.pile.handSize).toBe(0);
+  });
+});
+
+describe('调试：抽弃组合', () => {
+  it('弃完后仍能抽回来', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.debugDiscardAll();
+    expect(w.deck.pile.handSize).toBe(0);
+
+    w.debugDraw(2);
+    expect(w.deck.pile.handSize).toBe(2);
+  });
+
+  it('抽满后弃一张，再抽一张，手牌数量回到原值', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.debugFillHand();
+    const U = w.deck.pile.handSize;
+
+    w.debugDiscard(0);
+    expect(w.deck.pile.handSize).toBe(U - 1);
+
+    w.debugDraw(1);
+    expect(w.deck.pile.handSize).toBe(U);
+  });
+});
 });

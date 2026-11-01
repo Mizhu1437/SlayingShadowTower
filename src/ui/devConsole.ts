@@ -172,6 +172,72 @@ const COMMANDS: Command[] = [
     },
   },
 
+  // ── 抽牌 / 弃牌 ──
+  {
+    name: 'draw',
+    args: '[张数]',
+    desc: '抽牌（默认 1 张）',
+    run: (w, argv) => {
+      const n = argv[0] ? Number(argv[0]) : 1;
+      if (!Number.isFinite(n) || n < 1) {
+        return { ok: false, text: '用法：draw [张数]，例如 draw 3' };
+      }
+      const before = w.deck.pile.handSize;
+      const r = w.debugDraw(n);
+      const parts = [`抽 ${n} 张 → 实际得到 ${r.drawn} 张，手牌 ${before} → ${w.deck.pile.handSize}`];
+      if (r.overloaded) {
+        parts.push(`（触发过载：弃全部后重抽，停顿 ${w.deck.pauseLeft.toFixed(1)}s）`);
+      }
+      return { ok: true, text: parts.join('\n') };
+    },
+  },
+  {
+    name: 'discard',
+    args: '[位置]',
+    desc: '弃掉指定位置的牌（默认第 1 张，位置从 1 起）',
+    run: (w, argv) => {
+      const pos = argv[0] ? Number(argv[0]) : 1;
+      if (!Number.isFinite(pos) || pos < 1) {
+        return { ok: false, text: '用法：discard [位置]，例如 discard 2' };
+      }
+      const before = w.deck.pile.handSize;
+      if (before === 0) return { ok: false, text: '手牌已空' };
+
+      const card = w.debugDiscard(pos - 1);
+      if (!card) return { ok: false, text: `位置 ${pos} 超出范围（手牌 ${before} 张）` };
+
+      const r = `弃掉「${card.name}」（第 ${pos} 张），手牌 ${before} → ${w.deck.pile.handSize}`;
+      return { ok: true, text: r };
+    },
+  },
+  {
+    name: 'discardall',
+    args: '',
+    desc: '弃掉整手牌',
+    run: (w) => {
+      const n = w.debugDiscardAll();
+      return n > 0
+        ? { ok: true, text: `弃掉全部 ${n} 张，手牌已空` }
+        : { ok: false, text: '手牌已空' };
+    },
+  },
+  {
+    name: 'deck',
+    args: '',
+    desc: '查看牌堆构成（手牌 / 牌堆 / 弃牌）',
+    run: (w) => {
+      const pile = w.deck.pile;
+      const lines = [
+        `手牌 ${pile.handSize} · 牌堆 ${pile.drawCount} · 弃牌 ${pile.discardCount} · 合计 ${pile.totalCards}`,
+        '手牌：[ ' + (pile.hand.map((c) => c.name).join('  ') || '空') + ' ]',
+        '弃牌堆：' + (pile.allCards().length > 0
+          ? `共 ${pile.discardCount} 张`
+          : '空'),
+      ];
+      return { ok: true, text: lines.join('\n') };
+    },
+  },
+
   // ── 信息类 ──
   {
     name: 'status',
