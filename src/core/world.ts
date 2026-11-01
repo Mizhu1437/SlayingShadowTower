@@ -269,7 +269,7 @@ export class World {
     this.currentAct = actIndex;
 
     // 每幕开局：满能量、重洗牌堆
-    this.deck.resetForNewAct(createStarterDeck());
+    this.deck.resetForNewAct();
 
     // 第四幕的商店插在道中BOSS 之后、关底BOSS 之前（DESIGN 4.1）
     // 结构：1 精英 + 道中BOSS + 关底BOSS → 索引 0/1/2，道中BOSS 是第 1 波

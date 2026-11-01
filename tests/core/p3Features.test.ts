@@ -271,3 +271,96 @@ describe('波次倒计时 30 秒', () => {
     expect(w.waves.phase).toBe('running');
   });
 });
+
+describe('卡组跨幕保留（回归：买卡后下一幕消失）', () => {
+  it('商店买的卡在下一幕仍在牌组里', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.debugClearAct();
+    w.enterShop();
+    w.coins = 9999;
+
+    const idx = w.shop.state.items.findIndex(
+      (it) => it.kind === 'card' && it.card?.type === 'active',
+    );
+    expect(idx).toBeGreaterThanOrEqual(0);
+
+    const cardName = w.shop.state.items[idx]!.card!.name;
+    const before = w.deck.pile.totalCards;
+
+    expect(w.buyShopItem(idx).ok).toBe(true);
+    expect(w.deck.pile.totalCards).toBe(before + 1);
+
+    // 进入下一幕
+    w.leaveShopAndAdvance();
+
+    // 牌组总数应保持（不应退回初始 8 张）
+    expect(w.deck.pile.totalCards).toBe(before + 1);
+
+    // 买来的卡应该还在
+    const names = w.deck.pile.allCards().map((c) => c.name);
+    expect(names).toContain(cardName);
+  });
+
+  it('每幕开始只是重新洗牌，不替换牌组', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+
+    // 手动加一张特殊卡
+    w.deck.pile.addCard({
+      id: 'special_marker', name: '标记卡', type: 'active',
+      rarity: 'common', price: 1, energy: 1,
+      effects: [{ op: 'gain_coin', value: 1 }],
+    });
+    const total = w.deck.pile.totalCards;
+
+    w.startAct(1);
+
+    expect(w.deck.pile.totalCards).toBe(total);
+    expect(w.deck.pile.allCards().some((c) => c.id === 'special_marker')).toBe(true);
+  });
+
+  it('删卡效果也跨幕保留', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    const total = w.deck.pile.totalCards;
+
+    // 删掉一张
+    const target = w.deck.pile.allCards()[0]!;
+    w.deck.pile.removeCardById(target.id);
+    expect(w.deck.pile.totalCards).toBe(total - 1);
+
+    // 下一幕不应该补回来
+    w.startAct(1);
+    expect(w.deck.pile.totalCards).toBe(total - 1);
+  });
+
+  it('每幕开始手牌仍是初始张数', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+
+    // 多买几张卡把牌组撑大
+    for (let i = 0; i < 3; i++) {
+      w.deck.pile.addCard({
+        id: `extra_${i}`, name: `额外卡${i}`, type: 'active',
+        rarity: 'common', price: 1, energy: 1,
+        effects: [{ op: 'gain_coin', value: 1 }],
+      });
+    }
+
+    w.startAct(1);
+
+    // 手牌仍是初始 3 张（不是把整个牌组都塞手里）
+    expect(w.deck.pile.handSize).toBe(w.deck.pile.cfg.initial);
+  });
+
+  it('每幕开始能量回满', () => {
+    const w = new World({ seed: 1 });
+    w.startAct(0);
+    w.deck.energy.pay(w.deck.energy.cap);
+    expect(w.deck.energy.value).toBe(0);
+
+    w.startAct(1);
+    expect(w.deck.energy.value).toBe(w.deck.energy.cap);
+  });
+});

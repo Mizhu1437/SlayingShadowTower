@@ -259,9 +259,19 @@ export class Deck {
   }
 
   /** 每幕开局重置：能量回满、牌堆重洗、手牌回初始 */
-  resetForNewAct(deck: CardDef[]): void {
+  /**
+   * 进入新的一幕：重置牌堆状态，但**保留卡组内容**。
+   *
+   * 早期实现是 resetForNewAct(createStarterDeck())，
+   * 直接把整副牌换回初始 8 张 —— 商店买的卡一进下一幕就消失，
+   * 构筑完全失去意义。
+   *
+   * 现在改为：把现有全部卡（手牌 + 抽牌堆 + 弃牌堆）洗回抽牌堆，
+   * 再发初始手牌。买到的卡会正常参与后续循环。
+   */
+  resetForNewAct(): void {
     this.energy.refill();
-    this.pile.reset(deck);
+    this.pile.reshuffleAll();
     this.drawTimer = 0;
     this.drawPauseLeft = 0;
     this.selected = 0;

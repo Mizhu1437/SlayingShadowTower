@@ -170,9 +170,18 @@ export class ShopUI {
       restore_spell: '服务',
     };
 
+    // 卡牌要显示两个数字，含义完全不同，必须分清：
+    //   耗能 —— 打出这张牌要花多少能量（卡牌属性）
+    //   蜃銭 —— 买它要花多少钱（价格）
+    // 早期只显示了价格，玩家看不出这张牌费不费能量。
+    const energyBadge = item.card?.energy != null
+      ? `<div class="si-energy">${item.card.energy} 费</div>`
+      : '';
+
     el.innerHTML = `
       <div class="si-kind">${kindLabel[item.kind] ?? ''}</div>
       <div class="si-name">${item.name}</div>
+      ${energyBadge}
       <div class="si-desc">${item.desc}</div>
       <div class="si-price">${item.sold ? '已售出' : `${item.price} 蜃銭`}</div>
     `;

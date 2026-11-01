@@ -58,6 +58,31 @@ export class Pile {
     this.reset(deck);
   }
 
+  /**
+   * 把现有全部卡牌洗回抽牌堆，重新发初始手牌。
+   *
+   * 与 reset(deck) 的区别：
+   *   reset(deck)      —— 用传入的牌组整体替换（会丢掉商店买的卡）
+   *   reshuffleAll()   —— 只重排现有卡牌，卡组内容不变
+   *
+   * 每幕开始时用后者：玩家构筑的牌组必须跨幕保留。
+   */
+  reshuffleAll(): void {
+    const all = [...this.hand, ...this.drawPile, ...this.discardPile];
+    this.drawPile = all;
+    this.hand = [];
+    this.discardPile = [];
+    this.overloadCount = 0;
+
+    this.shuffle(this.drawPile);
+
+    const n = Math.min(this.cfg.initial, this.drawPile.length);
+    for (let i = 0; i < n; i++) {
+      const c = this.drawPile.pop();
+      if (c) this.hand.push(c);
+    }
+  }
+
   /** 洗牌并重置 */
   reset(deck: CardDef[]): void {
     this.drawPile = [...deck];
