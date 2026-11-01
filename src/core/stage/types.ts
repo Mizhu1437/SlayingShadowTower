@@ -93,26 +93,26 @@ export interface ActStructure {
  */
 export const ACT_STRUCTURE_1_TO_3: Omit<ActStructure, 'actId'> = {
   slots: [
-    { kind: 'normal', countMin: 2, countMax: 3, duration: 8 },
-    { kind: 'normal', countMin: 2, countMax: 3, duration: 8 },
-    { kind: 'normal', countMin: 2, countMax: 4, duration: 8 },
-    { kind: 'normal', countMin: 2, countMax: 4, duration: 8 },
-    { kind: 'elite', countMin: 1, countMax: 2, duration: 12 },
-    { kind: 'midboss', countMin: 1, countMax: 1, duration: 40 },
-    { kind: 'normal', countMin: 2, countMax: 3, duration: 8 },
-    { kind: 'normal', countMin: 3, countMax: 4, duration: 8 },
-    { kind: 'elite', countMin: 1, countMax: 2, duration: 12 },
-    { kind: 'elite', countMin: 1, countMax: 2, duration: 12 },
-    { kind: 'elite', countMin: 1, countMax: 2, duration: 12 },
-    { kind: 'boss', countMin: 1, countMax: 1, duration: 120 },
+    { kind: 'normal', countMin: 2, countMax: 3, duration: 30 },
+    { kind: 'normal', countMin: 2, countMax: 3, duration: 30 },
+    { kind: 'normal', countMin: 2, countMax: 4, duration: 30 },
+    { kind: 'normal', countMin: 2, countMax: 4, duration: 30 },
+    { kind: 'elite', countMin: 1, countMax: 2, duration: 30 },
+    { kind: 'midboss', countMin: 1, countMax: 1, duration: 30 },
+    { kind: 'normal', countMin: 2, countMax: 3, duration: 30 },
+    { kind: 'normal', countMin: 3, countMax: 4, duration: 30 },
+    { kind: 'elite', countMin: 1, countMax: 2, duration: 30 },
+    { kind: 'elite', countMin: 1, countMax: 2, duration: 30 },
+    { kind: 'elite', countMin: 1, countMax: 2, duration: 30 },
+    { kind: 'boss', countMin: 1, countMax: 1, duration: 30 },
   ],
 };
 
 export const ACT_STRUCTURE_4: Omit<ActStructure, 'actId'> = {
   slots: [
-    { kind: 'elite', countMin: 1, countMax: 2, duration: 12 },
-    { kind: 'midboss', countMin: 1, countMax: 1, duration: 40 },
-    { kind: 'boss', countMin: 1, countMax: 1, duration: 180 },
+    { kind: 'elite', countMin: 1, countMax: 2, duration: 30 },
+    { kind: 'midboss', countMin: 1, countMax: 1, duration: 30 },
+    { kind: 'boss', countMin: 1, countMax: 1, duration: 30 },
   ],
 };
 

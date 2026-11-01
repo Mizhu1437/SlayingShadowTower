@@ -450,6 +450,91 @@
     }
     .dc-input-row input:focus { border-color: #2ea44f; }
 
+    /* ── 牌堆查看 ── */
+    #pile-bar {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      display: flex;
+      gap: 6px;
+      z-index: 40;
+    }
+    .pv-btn {
+      padding: 6px 12px;
+      background: #101526;
+      border: 1px solid #26304d;
+      border-radius: 4px;
+      color: #9aa7c2;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color .12s, background .12s;
+    }
+    .pv-btn:hover { border-color: #6b8cff; background: #1a2140; }
+    .pv-btn.active { border-color: #6b8cff; background: #1e2a52; color: #d0e0ff; }
+    .pv-btn b { color: #ffd479; margin-left: 3px; }
+
+    .pile-viewer {
+      position: fixed;
+      right: 14px;
+      bottom: 54px;
+      width: 300px;
+      max-height: 52vh;
+      display: flex;
+      flex-direction: column;
+      background: rgba(10, 13, 24, 0.97);
+      border: 1px solid #2a3350;
+      border-radius: 6px;
+      z-index: 41;
+      font: 11px/1.5 "Consolas", "Menlo", monospace;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75);
+    }
+    .pile-viewer.hidden { display: none; }
+
+    .pv-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 10px;
+      border-bottom: 1px solid #222a44;
+      color: #c79bff;
+      font-size: 11px;
+    }
+    .pv-close {
+      background: none;
+      border: none;
+      color: #6f7d9c;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .pv-close:hover { color: #ff7b8a; }
+
+    .pv-list {
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pv-empty { color: #556071; padding: 12px; text-align: center; }
+
+    .pv-card {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #12172a;
+      border-left: 2px solid #3a4a75;
+      border-radius: 3px;
+    }
+    .pv-card.passive { border-left-color: #c79bff; }
+    .pv-name { color: #dfe6f5; font-weight: 600; }
+    .pv-cost { color: #ffd479; font-size: 10px; }
+    .pv-desc { flex-basis: 100%; color: #7d8aa5; font-size: 10px; }
+
   </style>
 </head>
 <body>

@@ -41,6 +41,22 @@ export class WaveRunner {
   /** 是否已停在中间点 */
   private pausedMidway = false;
 
+  /**
+   * 本波是否因倒计时结束而收场。
+   *
+   * 置为 true 时，World 会在推进到下一波之前清空全场敌人
+   * （不给分也不掉钱）。这比"把残敌留到下一波"干净得多：
+   * 否则敌人会随着波次无限累积，难度失控。
+   */
+  waveTimedOut = false;
+
+  /** 本波剩余秒数（供 HUD 显示倒计时） */
+  get waveRemainSeconds(): number {
+    const w = this.currentWaveDef;
+    if (!w) return 0;
+    return Math.max(0, w.duration - this.waveTime);
+  }
+
   /** 总波数，供 UI 显示进度 */
   get totalWaves(): number {
     return this.stage?.waves.length ?? 0;
@@ -126,29 +142,35 @@ export class WaveRunner {
     const allSpawned = this.spawnCursor >= wave.spawns.length;
 
     let finished = false;
+    let timedOut = false;
 
     if (wave.clearOn === 'all_dead') {
       // 必须先把敌人全部生成完，且场上清空，才算结束
       finished = allSpawned && this.hooks.aliveCount() === 0;
     } else if (wave.clearOn === 'either') {
       // 全灭 或 到时，满足其一即结束。
-      // 这样"打不动"也不会卡关，只是推进得慢一些。
       const allDead = allSpawned && this.hooks.aliveCount() === 0;
       const timeUp = this.waveTime >= wave.duration;
       finished = allDead || timeUp;
+      // 只有"到时且还有敌人活着"才算超时收场
+      timedOut = timeUp && !allDead;
     } else {
       // timeout：到时即结束
       finished = this.waveTime >= wave.duration;
     }
 
-    // 3. 硬超时兜底：避免因为敌人卡在场上导致永远无法推进
+    // 硬超时兜底：避免因为敌人卡在场上导致永远无法推进
     if (!finished && this.waveTime >= wave.duration * 2) {
       finished = true;
+      timedOut = this.hooks.aliveCount() > 0;
     }
 
     if (!finished) return false;
 
-    // 4. 进入下一波
+    // 记录本波是否超时收场，供 World 清场
+    this.waveTimedOut = timedOut;
+
+    // 进入下一波
     this.waveIndex++;
     this.waveTime = 0;
     this.spawnCursor = 0;

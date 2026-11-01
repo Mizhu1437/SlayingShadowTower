@@ -94,6 +94,16 @@ export class Pile {
     return this.discardPile.length;
   }
 
+  /** 抽牌堆的内容（只读快照，供 UI 展示） */
+  get drawCards(): readonly CardDef[] {
+    return this.drawPile;
+  }
+
+  /** 弃牌堆的内容（只读快照，供 UI 展示） */
+  get discardCards(): readonly CardDef[] {
+    return this.discardPile;
+  }
+
   /**
    * 往抽牌堆加入一张新卡（商店购买）。
    *

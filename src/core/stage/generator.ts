@@ -19,6 +19,16 @@ import type {
   WaveSlot,
 } from './types';
 
+/**
+ * 一波内敌人全部登场的时长（秒）。
+ *
+ * 固定值，不随波次倒计时变化：
+ * 敌人该在开头几秒内全部进场，剩下的时间才是战斗。
+ * 若跟着 duration 缩放，30 秒的波次会让最后一个敌人
+ * 在 10 秒后才出现，玩家会误以为卡关。
+ */
+const SPAWN_WINDOW = 5;
+
 /** 生成参数 */
 export interface GenOptions {
   /** 主种子 */
@@ -64,8 +74,18 @@ function genWave(
     const x = 0.12 + rng.next() * 0.76;
     // 纵向：从上方场外进场
     const y = -0.08 - rng.next() * 0.06;
-    // 错开生成时间，避免所有敌人同时出现
-    const delay = i * (slot.duration / Math.max(1, count)) * 0.7
+
+    // 错开生成时间，避免所有敌人同时出现。
+    //
+    // 注意这里用固定的 SPAWN_WINDOW，而不是 slot.duration。
+    // 早期用 duration 计算，波次时长从 8 秒改成 30 秒后，
+    // 最后一个敌人的延迟被放大到 10 秒以上 ——
+    // 玩家杀光场上敌人后要干等十几秒才会冒出下一个，
+    // 看起来就是"卡住了"。
+    //
+    // 生成窗口应当与"这一波持续多久"无关：
+    // 敌人该在前几秒内全部登场，之后才是真正的战斗时间。
+    const delay = i * (SPAWN_WINDOW / Math.max(1, count)) * 0.7
       + rng.next() * 0.3;
 
     spawns.push({

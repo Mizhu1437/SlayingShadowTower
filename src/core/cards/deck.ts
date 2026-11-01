@@ -123,10 +123,35 @@ export class Deck {
     return out;
   }
 
-  /** 获得一张被动卡 */
-  addPassive(card: CardDef): void {
-    if (card.type !== 'passive') return;
+  /**
+   * 被动卡槽位上限。
+   *
+   * 为什么要有上限：被动卡是"永久生效、无需出牌"的增益，
+   * 没有上限的话玩家会一路买被动，最终变成纯数值碾压，
+   * 主动卡与出牌决策就失去意义了。
+   * 上限 2 意味着必须取舍：这一局走哪条构筑路线。
+   */
+  passiveSlots = 2;
+
+  /** 被动卡是否已满 */
+  get passivesFull(): boolean {
+    return this.passives.length >= this.passiveSlots;
+  }
+
+  /** 剩余槽位 */
+  get passiveSlotsLeft(): number {
+    return Math.max(0, this.passiveSlots - this.passives.length);
+  }
+
+  /**
+   * 获得一张被动卡。
+   * 返回 false 表示槽位已满，调用方应退回金钱并提示玩家。
+   */
+  addPassive(card: CardDef): boolean {
+    if (card.type !== 'passive') return false;
+    if (this.passivesFull) return false;
     this.passives.push(card);
+    return true;
   }
 
   /** 获得一张主动卡（进入抽牌堆） */

@@ -15,6 +15,7 @@ import { GameRenderer } from './render/gameRenderer';
 import { HandUI } from './ui/handUI';
 import { ShopUI } from './ui/shopUI';
 import { DevConsole } from './ui/devConsole';
+import { PileViewer } from './ui/pileViewer';
 
 const SCALE = 1.6;
 
@@ -55,6 +56,9 @@ async function main() {
       leaveShop();
     },
   });
+
+  // 牌堆查看（右下角三个按钮）
+  const pileViewer = new PileViewer(document.body);
 
   // 开发者控制台：按 ~ 打开
   let consoleOpen = false;
@@ -223,6 +227,7 @@ async function main() {
 
     renderer.render(world);
     handUI.render(world.deck);
+    pileViewer.syncCounts(world.deck.pile);
 
     // HUD
     hudKills.textContent = String(world.kills);

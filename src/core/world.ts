@@ -576,6 +576,12 @@ export class World {
     const item = this.shop.state.items[index];
     if (!item) return { ok: false, reason: 'no_item' };
 
+    // 买单张被动卡前先检查槽位，满了直接拒绝（不扣钱）
+    if (item.kind === 'card' && item.card?.type === 'passive'
+      && this.deck.passivesFull) {
+      return { ok: false, reason: 'passive_slots_full' };
+    }
+
     const r = this.shop.buy(index, this.coins);
     if (!r.ok) return { ok: false, reason: r.reason };
 
@@ -585,7 +591,11 @@ export class World {
       case 'card':
         if (item.card) {
           if (item.card.type === 'passive') {
-            this.deck.addPassive({ ...item.card });
+            // 双保险：万一并发导致槽位在中途变满，退回钱
+            if (!this.deck.addPassive({ ...item.card })) {
+              this.coins += r.cost;
+              return { ok: false, reason: 'passive_slots_full' };
+            }
             this.refreshFromPassives();
           } else {
             this.deck.pile.addCard({ ...item.card });
@@ -746,6 +756,17 @@ export class World {
 
     // 波次推进（P3）：按时间轴生成敌人、判断本波是否结束
     this.waves.step(LOGIC_DT);
+
+    // 本波若因倒计时结束而收场，清空全场敌人（不给分、不掉钱）
+    if (this.waves.waveTimedOut) {
+      this.waves.waveTimedOut = false;
+      this.clearFieldOnTimeout();
+    }
+
+    // MISS 保护期（禁止放符卡）计时
+    if (this.missProtectLeft > 0) {
+      this.missProtectLeft = Math.max(0, this.missProtectLeft - LOGIC_DT);
+    }
 
     // 敌弹减速计时
     if (this.bulletSlowLeft > 0) {
@@ -962,6 +983,8 @@ export class World {
 
     // ── 3. 一段时间无敌 ──
     this.player.invuln = Math.max(this.player.invuln, MISS_CONFIG.invulnTime);
+    // 同一段时间内禁止放符卡（防止"撞一下白嫖一次符卡"）
+    this.missProtectLeft = Math.max(this.missProtectLeft, MISS_CONFIG.invulnTime);
 
     // ── 4. 正作规则：失去残机时符卡重置为初始数量 ──
     this.spell.onPlayerMiss();
@@ -1022,6 +1045,22 @@ export class World {
         pickupDelay: MISS_CONFIG.coinPickupDelay,
       });
     }
+  }
+
+  /**
+   * 波次倒计时结束时的清场。
+   *
+   * 清空场上所有敌人与敌弹，但**不给分、不掉钱** ——
+   * 这是"超时收场"而不是"击杀"，玩家没有付出相应代价，
+   * 因此也不该拿到奖励。否则故意拖到超时反而更划算。
+   */
+  private clearFieldOnTimeout(): void {
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      e.dead = true;
+      e.fadeOut = 0.15;
+    }
+    this.enemyBullets.clear();
   }
 
   /** 清掉半径内的敌人（MISS 复活保护） */
@@ -1120,6 +1159,17 @@ export class World {
   pressBomb(): boolean {
     if (this.flow.paused) return false;
 
+    // 撞弹重置后的保护性无敌期内不能放符卡。
+    //
+    // 为什么要有这条：MISS 后给的 3 秒无敌是"喘息时间"，
+    // 用来重新站位、观察弹幕。如果这期间还能放符卡，
+    // 玩家会形成"先撞一下再白嫖无敌放卡"的劣化玩法 ——
+    // 用掉一条命换一次免费符卡，比正常攒能量更划算。
+    //
+    // 用独立标记区分"MISS 无敌"与"符卡自身无敌"：
+    // 后者（spell.phase === 'active'）期间本来就该能继续操作。
+    if (this.missProtectLeft > 0) return false;
+
     if (this.spell.phase === 'deathbomb') {
       if (this.spell.tryBombDuringDeathbomb()) {
         // 决死成功：不进 MISS，无敌已由 SpellSystem 给出
@@ -1131,6 +1181,15 @@ export class World {
 
     return this.spell.tryCast();
   }
+
+  /**
+   * 撞弹重置后的保护期剩余秒数。
+   *
+   * 与 player.invuln 分开维护，因为两者含义不同：
+   *   player.invuln  —— 免伤（可能来自符卡、卡牌效果、MISS）
+   *   missProtectLeft —— "刚死过"的保护期，额外禁止放符卡
+   */
+  missProtectLeft = 0;
 
   private clearNearbyBullets(x: number, y: number, radius: number): void {
     const r2 = radius * radius;
