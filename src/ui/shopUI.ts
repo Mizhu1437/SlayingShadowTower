@@ -73,10 +73,22 @@ export class ShopUI {
   }
 
   /** 显示商店 */
+  /**
+   * 显示商店（每帧调用）。
+   *
+   * 注意：不能用 force=true 每次重建 DOM。
+   * 鼠标点击需要按下与抬起落在同一个元素上，如果每帧都重建，
+   * 元素会在两次事件之间被销毁（浏览器报 element was detached），
+   * 表现为"按钮完全点不动"。
+   *
+   * 所以这里传入 force=false，由 render 内部按签名判断是否需要重绘。
+   */
   show(shop: Shop, coins: number, allCards: CardDef[], pendingRemove: boolean): void {
+    const firstShow = !this.visible;
     this.visible = true;
     this.root.classList.remove('hidden');
-    this.render(shop, coins, allCards, pendingRemove, true);
+    // 首次打开必须强制绘制一次；之后交给签名判断
+    this.render(shop, coins, allCards, pendingRemove, firstShow);
   }
 
   /** 隐藏商店 */
