@@ -107,6 +107,7 @@ async function main() {
   const hudSpell = document.getElementById('spell')!;
   const hudWave = document.getElementById('wave')!;
   const hudAct = document.getElementById('act')!;
+  const hudTimer = document.getElementById('wave-timer')!;
 
   // ---------- 续关 / 结算面板 ----------
   const overlay = document.getElementById('overlay')!;
@@ -243,6 +244,16 @@ async function main() {
       wv.phase === 'running' ? `${wv.currentWave}/${wv.totalWaves}`
         : wv.phase === 'done' ? '完成'
           : wv.isPausedMidway ? '整备' : '—';
+
+    // 本波倒计时。剩余不足 10 秒时变红，提示即将超时清场。
+    if (wv.phase === 'running') {
+      const remain = wv.waveRemainSeconds;
+      hudTimer.textContent = `${remain.toFixed(1)}s`;
+      hudTimer.classList.toggle('urgent', remain <= 10 && remain > 0);
+    } else {
+      hudTimer.textContent = '—';
+      hudTimer.classList.remove('urgent');
+    }
 
     // ── 幕间商店 ──
     // 一幕打完后自动进入商店（只触发一次：enterShop 内部会拒绝重复进入）

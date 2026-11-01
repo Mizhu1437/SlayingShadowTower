@@ -37,6 +37,15 @@ export class PileViewer {
   private counts = { draw: 0, discard: 0, all: 0 };
   /** 数据源。按钮点击时用它取最新内容，避免每帧传参 */
   private pileRef: Pile | null = null;
+  /** 上次渲染的内容签名，用于判断是否需要重建 */
+  private lastSig = '';
+
+  /** 按标签取牌堆内容 */
+  private readCards(pile: Pile, tab: Tab): CardDef[] {
+    if (tab === 'draw') return [...pile.drawCards];
+    if (tab === 'discard') return [...pile.discardCards];
+    return [...pile.allCards()];
+  }
 
   constructor(host: HTMLElement) {
     this.root = document.createElement('div');
@@ -89,10 +98,28 @@ export class PileViewer {
     }
   }
 
-  /** 每帧调用：只更新按钮上的数字，不重建面板 */
+  /**
+   * 每帧调用：只更新按钮上的数字，不重建面板。
+   *
+   * 但面板打开时，牌堆内容会变（抽牌、弃牌、洗回），
+   * 必须跟着刷新 —— 否则玩家看到的是打开那一刻的旧快照。
+   * 用签名判断内容是否真的变了，避免无谓重建。
+   */
   syncCounts(pile: Pile): void {
     // 记住数据源，供按钮点击时读取
     this.pileRef = pile;
+
+    // 面板打开时同步内容
+    if (this.open) {
+      const cards = this.readCards(pile, this.tab);
+      const sig = cards.map((c) => c.id).join(',');
+      if (sig !== this.lastSig) {
+        this.lastSig = sig;
+        this.snapshot = cards;
+        this.titleEl.textContent = `${TAB_LABEL[this.tab]}（${cards.length} 张）`;
+        this.renderList();
+      }
+    }
 
     const draw = pile.drawCount;
     const discard = pile.discardCount;
@@ -127,13 +154,14 @@ export class PileViewer {
     this.open = true;
     this.tab = tab;
 
-    if (pile) {
-      this.snapshot = tab === 'draw'
-        ? [...pile.drawCards]
-        : tab === 'discard'
-          ? [...pile.discardCards]
-          : [...pile.allCards()];
+    const src = pile ?? this.pileRef;
+    if (src) {
+      this.snapshot = this.readCards(src, tab);
+    } else {
+      this.snapshot = [];
     }
+    // 记录签名，避免下一帧 syncCounts 重复重建
+    this.lastSig = this.snapshot.map((c) => c.id).join(',');
 
     this.titleEl.textContent = `${TAB_LABEL[tab]}（${this.snapshot.length} 张）`;
     this.root.classList.remove('hidden');
