@@ -14,6 +14,7 @@ import { Input } from './render/input';
 import { GameRenderer } from './render/gameRenderer';
 import { HandUI } from './ui/handUI';
 import { ShopUI } from './ui/shopUI';
+import { DevConsole } from './ui/devConsole';
 
 const SCALE = 1.6;
 
@@ -53,6 +54,28 @@ async function main() {
     onLeave: () => {
       leaveShop();
     },
+  });
+
+  // 开发者控制台：按 ~ 打开
+  let consoleOpen = false;
+  const devConsole = new DevConsole(document.body, world, (open) => {
+    consoleOpen = open;
+  });
+
+  window.addEventListener('keydown', (e) => {
+    // 反引号键：不同键盘布局的 key 值可能是 ` 或 ~
+    if (e.key === '`' || e.key === '~' || e.code === 'Backquote') {
+      // 不能因为焦点在输入框里就跳过：
+      // 控制台打开时焦点总在它自己的输入框上，那样就永远关不掉。
+      // 只排除"其他"输入框（将来可能加搜索框之类）。
+      const el = e.target as HTMLElement | null;
+      const isConsoleInput = el?.id === 'dc-input';
+      const inOtherInput = (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA')
+        && !isConsoleInput;
+      if (inOtherInput) return;
+      e.preventDefault();
+      devConsole.toggle();
+    }
   });
 
   let shopHint = '';
@@ -174,6 +197,16 @@ async function main() {
       hudFps.textContent = (fpsFrames / fpsAcc).toFixed(0);
       fpsAcc = 0;
       fpsFrames = 0;
+    }
+
+    // 控制台打开时冻结游戏输入，避免打字时自机乱跑
+    if (consoleOpen) {
+      world.input = { dx: 0, dy: 0, focus: false };
+      input.clearPressed();
+      renderer.render(world);
+      handUI.render(world.deck);
+      syncOverlay();
+      return;
     }
 
     // 输入 → 逻辑

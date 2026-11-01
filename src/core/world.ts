@@ -8,6 +8,7 @@
  */
 
 import { Player, type InputState } from './player';
+import { DebugState } from './debug';
 import { CardShots } from './shot/cardShots';
 import { BURN_CONFIG } from './status';
 import { Shop } from './shop/shop';
@@ -174,6 +175,9 @@ export class World {
 
   /** 幕间商店 */
   readonly shop: Shop = new Shop();
+
+  /** 开发者调试开关（无敌 / 锁能量 / 锁金钱） */
+  readonly debug: DebugState = new DebugState();
 
   /** 已通过的幕数 */
   actsCleared = 0;
@@ -347,6 +351,98 @@ export class World {
     }
   }
 
+  /**
+   * 调试用：跳到指定幕的指定波。
+   *
+   * @param actIndex 幕编号（0 起）
+   * @param waveNumber 第几波（1 起）。传 0 表示跳到该幕开头。
+   *
+   * 实现方式：先正常启动该幕，然后快速把前面的波次推完
+   * （不生成敌人、不计分），只保留目标波。
+   * 这样不用给 WaveRunner 加"瞬移"这种只为调试存在的接口。
+   */
+  debugJumpToWave(actIndex: number, waveNumber: number): boolean {
+    if (actIndex < 0 || actIndex >= World.TOTAL_ACTS) return false;
+
+    // 清掉当前状态，避免旧敌人/弹幕残留
+    this.enemies.length = 0;
+    this.pendingSpawns.length = 0;
+    this.enemyBullets.clear();
+    this.coinDrops.length = 0;
+
+    this.flow.phase = 'playing';
+    if (!this.startAct(actIndex)) return false;
+
+    const target = Math.max(1, Math.min(waveNumber, this.waves.totalWaves));
+    if (target <= 1) return true;
+
+    // 把前面的波次直接跳过（用超大 dt 触发推进，不等待生成）
+    for (let i = 1; i < target; i++) {
+      this.waves.step(99999);
+      if (this.waves.phase !== 'running') break;
+    }
+
+    this.enemies.length = 0;
+    this.pendingSpawns.length = 0;
+    return true;
+  }
+
+  /**
+   * 调试用：跳到商店。
+   *
+   * @param actIndex 在第几幕的商店（0 起）
+   */
+  debugJumpToShop(actIndex: number): boolean {
+    if (actIndex < 0 || actIndex >= World.TOTAL_ACTS) return false;
+
+    this.enemies.length = 0;
+    this.pendingSpawns.length = 0;
+    this.enemyBullets.clear();
+
+    this.flow.phase = 'playing';
+    if (!this.startAct(actIndex)) return false;
+
+    // 直接标记本幕完成
+    this.debugClearAct();
+
+    return this.enterShop();
+  }
+
+  /** 调试用：设置金币 */
+  debugSetCoins(n: number): void {
+    this.coins = Math.max(0, Math.floor(n));
+  }
+
+  /** 调试用：设置残机 */
+  debugSetLives(n: number): void {
+    this.player.lives = Math.max(1, Math.floor(n));
+    this.player.dead = false;
+  }
+
+  /** 调试用：设置符卡数量 */
+  debugSetSpells(n: number): void {
+    this.spell.cards = Math.max(0, Math.min(this.spell.cardsLimit, Math.floor(n)));
+  }
+
+  /** 调试用：补充能量 */
+  debugFillEnergy(): void {
+    this.deck.energy.refill();
+  }
+
+  /** 调试用：立即抽满手牌 */
+  debugFillHand(): void {
+    const U = this.deck.pile.cfg.upper;
+    let guard = 0;
+    while (this.deck.pile.handSize < U && guard++ < 20) {
+      const r = this.deck.drawNow(1);
+      if (r.drawn === 0 && !r.overloaded) break;
+    }
+  }
+
+  /**
+   * 调试用：跳到指定幕的指定波。
+   */
+
   /** 当前幕编号（0 起） */
   currentAct = 0;
 
@@ -513,7 +609,10 @@ export class World {
     const played = this.deck.playSelected();
     if (!played) return false;
 
-    this.deck.energy.pay(cost);
+    // 调试开关：锁能量时不扣费（但卡照常打出）
+    if (!this.debug.lockEnergy) {
+      this.deck.energy.pay(cost);
+    }
 
     this.lastEffectLog = [];
     if (played.effects) {
@@ -732,6 +831,8 @@ export class World {
     //   兜底条件也不成立"的漏洞，中弹被静默吞掉。
     //   这道守卫让两者含义一致：符卡生效 = 打不到。
     if (this.spell.phase === 'active') return;
+    // 调试开关：无敌时完全不进入中弹判定
+    if (this.debug.invincible) return;
     if (!this.player.vulnerable) return;
 
     const px = this.player.x;
@@ -799,12 +900,17 @@ export class World {
     if (!took) return;
 
     // ── 1. 损失 40% 蜃銭，并在撞弹处爆出一半 ──
-    const lost = Math.floor(this.coins * MISS_CONFIG.coinLossRatio);
-    if (lost > 0) {
-      this.coins -= lost;
-      const dropped = Math.floor(lost * MISS_CONFIG.coinDropRatio);
-      if (dropped > 0) {
-        this.spawnCoinDrop(hitX, hitY, dropped);
+    //
+    // 调试开关 lockCoins 打开时跳过整段：既不扣钱也不爆钱，
+    // 这样调试时不会在地图上留下一堆无意义的掉落物。
+    if (!this.debug.lockCoins) {
+      const lost = Math.floor(this.coins * MISS_CONFIG.coinLossRatio);
+      if (lost > 0) {
+        this.coins -= lost;
+        const dropped = Math.floor(lost * MISS_CONFIG.coinDropRatio);
+        if (dropped > 0) {
+          this.spawnCoinDrop(hitX, hitY, dropped);
+        }
       }
     }
 
