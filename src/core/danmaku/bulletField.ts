@@ -131,6 +131,20 @@ export class BulletField {
   }
 
   /**
+   * 边界剔除的范围（超出即销毁）。
+   *
+   * 为什么必须有：早期只靠寿命回收，子弹会一直飞到场地外
+   * 才因寿命耗尽消失 —— 视觉上就是"子弹飘出战斗区"。
+   * 而且它们还在参与碰撞遍历，白白浪费性能。
+   *
+   * 留 margin 是为了让子弹在**完全离开可视区**后才销毁，
+   * 避免贴边时突然消失。
+   */
+  cullBounds = {
+    left: -24, top: -24, right: 384 + 24, bottom: 448 + 24,
+  };
+
+  /**
    * 逐帧积分：位置 += 速度，速度 += 加速度。
    *
    * 注意循环上界是 highWater 而非 capacity：
@@ -139,6 +153,7 @@ export class BulletField {
   integrate(dt: number): void {
     const { x, y, vx, vy, ax, ay, age, life, state } = this;
     const limit = this.highWater;
+    const b = this.cullBounds;
 
     for (let i = 0; i < limit; i++) {
       if (state[i] === BulletState.Dead) continue;
@@ -149,7 +164,12 @@ export class BulletField {
       y[i] += vy[i] * dt;
       age[i] += dt;
 
-      if (age[i] >= life[i]) {
+      // 超出边界 or 寿命耗尽 → 回收
+      const outOfBounds =
+        x[i]! < b.left || x[i]! > b.right ||
+        y[i]! < b.top || y[i]! > b.bottom;
+
+      if (age[i]! >= life[i]! || outOfBounds) {
         state[i] = BulletState.Dead;
         this.freeList[this.freeCount++] = i;
         this.aliveCount--;

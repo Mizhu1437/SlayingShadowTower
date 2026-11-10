@@ -38,9 +38,13 @@ function computeViewport(): { vw: number; vh: number; scale: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // 战场高度占窗口 84%，宽度不超过窗口 46%（留出两侧面板空间）
-  const byH = (vh * 0.84) / FH;
-  const byW = (vw * 0.46) / FIELD_LOGICAL_W;
+  // 战场下方要放手牌区（灵力 34 + 手牌 160 + 数量行 18 + 按钮 40 ≈ 260px）
+  const BOTTOM_ZONE = 264;
+  const TOP_ZONE = 56;          // 顶部幕次横幅
+  const availH = Math.max(240, vh - BOTTOM_ZONE - TOP_ZONE);
+
+  const byH = availH / FH;
+  const byW = (vw * 0.52) / FIELD_LOGICAL_W;
   const scale = Math.min(byH, byW);
 
   return { vw, vh, scale };
@@ -79,19 +83,57 @@ async function main() {
   // 外框整体缩放，战场就在 frame.fieldHost 里
   frame.root.scale.set(vp.scale);
 
-  // 战场**偏左**摆放：右侧要留出手牌区的空间。
+  // 战场**居中**，手牌在它正下方。
   //
-  // 手牌在右下角，宽约 420px。若战场居中，手牌会压在战场右缘上。
-  // 把战场重心左移，让右侧形成一条完整的"手牌 + 状态"竖栏，
-  // 同时左侧空出来的宽度正好放幕次横幅与被动区。
+  // 为什么改回居中：手牌跟着战场走、贴在战场正下方，
+  // 玩家的视线从弹幕下移一眼就能看到手牌，不用左右扫视。
+  // 代价是战场不能占满高度，要给下方手牌留出空间。
   const fieldW = FIELD_LOGICAL_W * vp.scale;
-  const fieldH = FH * vp.scale;
-  const HAND_COLUMN = 430;         // 右侧竖栏预留宽度（px）
-  const x = Math.round((vp.vw - fieldW - HAND_COLUMN) / 2);
-  frame.root.position.set(
-    Math.max(24, x),
-    Math.round((vp.vh - fieldH) / 2),
-  );
+
+  // 战场放在顶部留白之下，下方整块留给手牌区
+  const topGap = 56;
+  const fieldLeft = Math.round((vp.vw - fieldW) / 2);
+  const fieldTop = Math.round(topGap);
+  frame.root.position.set(fieldLeft, fieldTop);
+
+  /**
+   * 按战场矩形摆放 DOM 元素。
+   *
+   * 竖直方向（自上而下）：
+   *   战场
+   *   灵力 / 符卡     ← 手牌区正上方
+   *   手牌卡片
+   *   手牌数量 / 状态
+   *   牌堆按钮        ← 贴窗口底
+   *
+   * 全部用 fixed + 计算出的坐标，窗口缩放时重新算一次。
+   */
+  function syncLayout(): void {
+    const v = computeViewport();
+    const fTop = 56;
+    const fBottom = Math.round(fTop + FH * v.scale);
+    const fLeft = Math.round((v.vw - FIELD_LOGICAL_W * v.scale) / 2);
+    const fRight = Math.round(fLeft + FIELD_LOGICAL_W * v.scale);
+
+    // 灵力/符卡：贴着战场底边下方
+    const bl = document.getElementById('bottom-left');
+    if (bl) bl.style.top = `${fBottom + 6}px`;
+
+    // 手牌区：灵力下方
+    const hand = document.getElementById('hand-area');
+    if (hand) hand.style.top = `${fBottom + 42}px`;
+
+    // 牌堆按钮：贴着战场左右两侧的下方
+    const bar = document.getElementById('pile-bar');
+    if (bar) {
+      bar.style.left = `${fLeft}px`;
+      bar.style.width = `${fRight - fLeft}px`;
+      bar.style.bottom = '14px';
+      bar.style.justifyContent = 'space-between';
+    }
+  }
+  syncLayout();
+  window.addEventListener('resize', syncLayout);
 
   const renderer = new GameRenderer(app, 1);
   frame.fieldHost.addChild(renderer.root);
@@ -107,12 +149,6 @@ async function main() {
   }
   const loop = new FixedStep();
   const handUI = new HandUI(document.getElementById('hand-area')!);
-
-  // 操作提示折叠
-  const helpEl = document.getElementById('help');
-  document.getElementById('help-toggle')?.addEventListener('click', () => {
-    helpEl?.classList.toggle('collapsed');
-  });
 
   const shopUI = new ShopUI(document.body, {
     onBuy: (index) => {

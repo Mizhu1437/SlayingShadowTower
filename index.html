@@ -211,15 +211,19 @@
      *   手牌卡片  bottom:70px
      * 手牌区整体从 bottom:70 往上长，不会压到按钮。
      */
+    /*
+     * 手牌区贴在**战斗区正下方**，水平居中。
+     * 具体 top 由 main.ts 按战场底边计算（见 syncLayout）。
+     */
     #hand-area {
       position: fixed;
-      right: 16px;
-      bottom: 48px;
-      width: 420px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 640px;
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
+      align-items: center;
+      gap: 3px;
       z-index: 25;
     }
     #hand-area .hand,
@@ -432,15 +436,15 @@
       white-space: nowrap;
     }
 
-    /* 右上：单行状态 */
+    /* 右侧空白区：状态列表，垂直居中偏上 */
     #top-status {
       position: fixed;
-      top: 16px;
-      right: 28px;
+      right: 6%;
+      top: 30%;
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
+      align-items: flex-start;
+      gap: 14px;
       pointer-events: none;
       z-index: 30;
       font-family: "Consolas", "Menlo", monospace;
@@ -448,42 +452,48 @@
     .ts-row {
       display: flex;
       align-items: center;
-      gap: 16px;
-      white-space: nowrap;   /* 关键：所有项都在同一行，不换行 */
-    }
-    .ts-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
+      gap: 10px;
+      white-space: nowrap;
+      min-width: 150px;
     }
     .ts-label {
-      font-size: 10px;
+      font-size: 11px;
       color: #7d8aa8;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      min-width: 34px;
     }
     .ts-num {
-      font-size: 17px;
+      font-size: 19px;
       font-weight: 700;
       color: #9fe3ff;
       text-shadow: 0 0 8px rgba(159, 227, 255, 0.45);
     }
     .ts-coin { width: 18px; height: 18px; image-rendering: pixelated; }
 
-    .ts-stars { display: flex; gap: 3px; }
+    .ts-stars { display: flex; gap: 4px; }
     .ts-stars .life-star {
-      width: 14px; height: 14px;
+      width: 16px; height: 16px;
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%,
                          79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
       background: linear-gradient(160deg, #ffe6a0, #ff9f5c);
       filter: drop-shadow(0 0 4px rgba(255, 200, 120, 0.7));
     }
 
-    .ts-spells { display: flex; gap: 3px; }
+    .ts-spells { display: flex; gap: 4px; }
     .ts-spells .spell-tag {
-      width: 11px; height: 22px;
+      width: 12px; height: 24px;
       border-radius: 2px;
       background: linear-gradient(180deg, #e0c8ff, #9b6fd6);
       box-shadow: 0 0 6px rgba(180, 140, 255, 0.65);
+    }
+
+    /* 波次块：独占一段，与上面五项隔开 */
+    .ts-wave-block {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 6px;
+      min-width: 150px;
     }
 
     /* 波次行：WAVE 6/12 + 进度条 + 倒计时 */
@@ -511,13 +521,15 @@
 
     /* 左下：灵力 + 符卡 */
     /* 左下角自下而上：? 按钮(14) → 被动符卡(52) → 灵力/符卡(180) */
+    /* 灵力/符卡：手牌区正上方，横向一行。top 由 main.ts 的 syncLayout 设 */
     #bottom-left {
       position: fixed;
-      left: 28px;
-      bottom: 188px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      flex-direction: column;
-      gap: 8px;
+      flex-direction: row;
+      align-items: center;
+      gap: 24px;
       pointer-events: none;
       z-index: 26;
       font-family: "Consolas", "Menlo", monospace;
@@ -730,14 +742,21 @@
     .dc-input-row input:focus { border-color: #2ea44f; }
 
     /* ── 牌堆查看 ── */
+    /*
+     * 牌堆按钮：抽牌堆贴右下、弃牌堆贴左下、卡组在中间。
+     * 位置由 main.ts 的 syncLayout 计算（跟随战斗区）。
+     */
     #pile-bar {
       position: fixed;
-      right: 14px;
-      bottom: 12px;
+      top: auto;
+      bottom: 14px;
       display: flex;
-      gap: 6px;
+      gap: 8px;
       z-index: 40;
     }
+    #pile-bar .pv-btn[data-tab="draw"] { order: 3; }
+    #pile-bar .pv-btn[data-tab="discard"] { order: 1; }
+    #pile-bar .pv-btn[data-tab="all"] { order: 2; }
     .pv-btn {
       padding: 6px 12px;
       background: #101526;
@@ -1099,34 +1118,34 @@
     <div class="ab-text" id="act-name">第一幕　妖怪之山 · 流言</div>
   </div>
 
-  <!-- 右上：单行状态（图标 + 数字，不换行） -->
+  <!-- 右侧空白区：状态，一行一组 -->
   <div id="top-status">
     <div class="ts-row">
-      <div class="ts-item">
-        <span class="ts-label">残机</span>
-        <span class="ts-stars" id="lives-row"></span>
-      </div>
-      <div class="ts-item">
-        <span class="ts-label">符卡</span>
-        <span class="ts-spells" id="spell-row"></span>
-      </div>
-      <div class="ts-item">
-        <img class="ts-coin" src="./art/ui/coin_icon.png" alt="" />
-        <span class="ts-num" id="coins">0</span>
-      </div>
-      <div class="ts-item">
-        <span class="ts-label">击破</span>
-        <span class="ts-num" id="kills">0</span>
-      </div>
-      <div class="ts-item">
-        <span class="ts-label">得分</span>
-        <span class="ts-num" id="score">0</span>
-      </div>
+      <span class="ts-label">残机</span>
+      <span class="ts-stars" id="lives-row"></span>
     </div>
-    <div class="ts-wave-line">
-      <span class="ts-wave-num" id="wave">WAVE 1 / 12</span>
+    <div class="ts-row">
+      <span class="ts-label">符卡</span>
+      <span class="ts-spells" id="spell-row"></span>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">蜃銭</span>
+      <img class="ts-coin" src="./art/ui/coin_icon.png" alt="" />
+      <span class="ts-num" id="coins">0</span>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">击破</span>
+      <span class="ts-num" id="kills">0</span>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">得分</span>
+      <span class="ts-num" id="score">0</span>
+    </div>
+
+    <div class="ts-wave-block">
+      <div class="ts-wave-num" id="wave">WAVE 1 / 12</div>
       <div class="ts-wave-bar"><div class="ts-wave-fill" id="wave-bar"></div></div>
-      <span class="ts-timer" id="wave-timer">30.0s</span>
+      <div class="ts-timer" id="wave-timer">30.0s</div>
     </div>
   </div>
 
@@ -1149,12 +1168,6 @@
     <span id="fps">—</span>
   </div>
 
-  <!-- 操作提示：默认收起，点 ? 展开 -->
-  <div id="help" class="panel collapsed">
-    <div id="help-toggle">?</div>
-    <div id="help-body">
-      <div><kbd>方向键</kbd>/<kbd>WASD</kbd> 移动　<kbd>Shift</kbd> 低速</div>
-      <div><kbd>Z</kbd> 打出卡牌　<kbd>C</kbd> 切换　<kbd>X</kbd> 符卡</div>
       <div><kbd>E</kbd> 抽牌堆　<kbd>Q</kbd> 弃牌堆　<kbd>Tab</kbd> 卡组</div>
     </div>
   </div>
