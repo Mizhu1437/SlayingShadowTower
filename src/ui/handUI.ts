@@ -16,6 +16,9 @@ export class HandUI {
   private readonly energyEl: HTMLElement;
   private readonly energyBarEl: HTMLElement;
   private readonly infoEl: HTMLElement;
+  /** 手牌 N / 上限，贴在手牌区上方 */
+  private readonly countEl: HTMLElement;
+  private lastCountSig = '';
 
   /** 缓存上一次渲染的状态，避免每帧重建 DOM */
   private lastSig = '';
@@ -37,6 +40,12 @@ export class HandUI {
     energyWrap.appendChild(this.energyBarEl);
 
     host.appendChild(energyWrap);
+
+    // 手牌数量 / 上限，贴在手牌区正上方
+    this.countEl = document.createElement('div');
+    this.countEl.className = 'hand-count';
+    host.appendChild(this.countEl);
+
     host.appendChild(this.root);
 
     this.infoEl = document.createElement('div');
@@ -95,6 +104,13 @@ export class HandUI {
     const deckInfo =
       `牌堆 ${deck.pile.drawCount} · 弃牌 ${deck.pile.discardCount}`;
     this.infoEl.textContent = `${info}　｜　${deckInfo}`;
+
+    // 手牌数 / 上限
+    const cnt = `${deck.pile.handSize} / ${deck.pile.cfg.upper}`;
+    if (cnt !== this.lastCountSig) {
+      this.lastCountSig = cnt;
+      this.countEl.textContent = `手牌 ${cnt}`;
+    }
     this.infoEl.classList.toggle('overload', deck.paused);
   }
 

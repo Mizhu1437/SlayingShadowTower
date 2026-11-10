@@ -3,8 +3,11 @@
  *
  * 结构（自下而上）：
  *   far   TilingSprite  速度 0.00   ← 天空在真实飞行中不动
- *   mid   TilingSprite  速度 0.30
  *   near  TilingSprite  速度 0.75
+ *
+ * 中景层（mid）已移除：该图层是一排松林剪影，滚动时反复经过
+ * 非常突兀，且与"悬浮在空中的塔"这个场景设定冲突。
+ * 素材仍保留在 docs/art/stages/，将来若重做中景可以再启用。
  *   overlay Sprite      不滚动      ← 保证弹幕可读性，硬约束
  *   ──── 以下为战场内容（由 GameRenderer 添加）────
  *
@@ -20,7 +23,7 @@ import { Assets, Container, Sprite, Texture, TilingSprite } from 'pixi.js';
 import { FIELD_W, FIELD_H } from '../core/world';
 
 /** 三层视差的速度倍率（像素/秒，乘以基准速度） */
-const LAYER_SPEED = [0, 0.30, 0.75] as const;
+const LAYER_SPEED = [0, 0.75] as const;  // far, near
 
 /** 基准滚动速度（px/s）。近景按 0.75 算，约 135 px/s。 */
 const BASE_SCROLL = 180;
@@ -31,7 +34,6 @@ export class StageBackdrop {
   readonly root: Container;
 
   private far!: TilingSprite;
-  private mid!: TilingSprite;
   private near!: TilingSprite;
   private overlay!: Sprite;
 
@@ -59,7 +61,6 @@ export class StageBackdrop {
     for (let act = 1; act <= ACT_COUNT; act++) {
       const names = [
         `act${act}_far.png`,
-        `act${act}_mid.png`,
         `act${act}_near.png`,
         `act${act}_overlay.png`,
       ];
@@ -78,7 +79,7 @@ export class StageBackdrop {
     const tex = this.cache.get(1);
     if (!tex) throw new Error('StageBackdrop: 请先 preload()');
 
-    const [farT, midT, nearT, ovT] = tex as [Texture, Texture, Texture, Texture];
+    const [farT, nearT, ovT] = tex as [Texture, Texture, Texture];
 
     // TilingSprite 的高度用场地高度的两倍：
     // 纹理本身 384×768（纵向无缝），tilePosition 递增时视觉上无限滚动。
@@ -92,14 +93,13 @@ export class StageBackdrop {
       new TilingSprite({ texture: t, width: FIELD_W, height: FIELD_H });
 
     this.far = make(farT);
-    this.mid = make(midT);
     this.near = make(nearT);
 
     this.overlay = new Sprite(ovT);
     this.overlay.width = FIELD_W;
     this.overlay.height = FIELD_H;
 
-    this.root.addChild(this.far, this.mid, this.near, this.overlay);
+    this.root.addChild(this.far, this.near, this.overlay);
 
     this.currentAct = 1;
   }
@@ -116,9 +116,8 @@ export class StageBackdrop {
     const tex = this.cache.get(actNo);
     if (!tex) return;
 
-    const [farT, midT, nearT, ovT] = tex as [Texture, Texture, Texture, Texture];
+    const [farT, nearT, ovT] = tex as [Texture, Texture, Texture];
     this.far.texture = farT;
-    this.mid.texture = midT;
     this.near.texture = nearT;
     this.overlay.texture = ovT;
 
@@ -135,8 +134,7 @@ export class StageBackdrop {
 
     // 远景速度为 0：天空不动
     this.far.tilePosition.y += LAYER_SPEED[0] * BASE_SCROLL * dt;
-    this.mid.tilePosition.y += LAYER_SPEED[1] * BASE_SCROLL * dt;
-    this.near.tilePosition.y += LAYER_SPEED[2] * BASE_SCROLL * dt;
+    this.near.tilePosition.y += LAYER_SPEED[1] * BASE_SCROLL * dt;
   }
 
   /**

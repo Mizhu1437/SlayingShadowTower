@@ -145,16 +145,21 @@ async function main() {
    * 比读数字快得多 —— 这是弹幕游戏里生死攸关的信息。
    */
   let lastLivesSig = '';
-  function renderLives(lives: number, max: number): void {
-    const total = Math.max(max, lives);
-    const sig = `${lives}/${total}`;
+  function renderLives(lives: number): void {
+    // 星数 = 残机数 - 1。
+    //
+    // 为什么：残机 0 时你还在场上打（那是最后一条命），
+    // 所以 3 残机只该显示 2 颗星 —— 星星表示"还能死几次"。
+    // 这和东方正作一致：★ 是备用的命，不是当前这条。
+    const stars = Math.max(0, lives - 1);
+    const sig = String(stars);
     if (sig === lastLivesSig) return;
     lastLivesSig = sig;
 
     hudLivesRow.innerHTML = '';
-    for (let i = 0; i < total; i++) {
+    for (let i = 0; i < stars; i++) {
       const d = document.createElement('div');
-      d.className = 'life-star' + (i < lives ? '' : ' lost');
+      d.className = 'life-star';
       hudLivesRow.appendChild(d);
     }
   }
@@ -164,15 +169,20 @@ async function main() {
    * 同样不用数字 —— 符卡是稀缺资源，需要一眼看清还剩几张。
    */
   let lastSpellSig = '';
-  function renderSpellSlots(cards: number, limit: number): void {
-    const sig = `${cards}/${limit}`;
+  function renderSpellSlots(cards: number): void {
+    // 只画剩余的符卡，不保留空槽。
+    //
+    // 为什么：符卡在游戏过程中可以补充（买道具、被动效果），
+    // 留空槽会让人以为"这些位置以后还能填"，但实际数量是浮动的。
+    // 直接删掉用尽的，数量就是数量。
+    const sig = String(cards);
     if (sig === lastSpellSig) return;
     lastSpellSig = sig;
 
     hudSpellRow.innerHTML = '';
-    for (let i = 0; i < limit; i++) {
+    for (let i = 0; i < cards; i++) {
       const d = document.createElement('div');
-      d.className = 'spell-tag' + (i < cards ? '' : ' empty');
+      d.className = 'spell-tag';
       hudSpellRow.appendChild(d);
     }
   }
@@ -324,8 +334,8 @@ async function main() {
     hudKills.textContent = String(world.kills);
     hudScore.textContent = String(world.score);
     hudCoins.textContent = String(world.coins);
-    renderLives(world.player.lives, world.player.cfg.lives);
-    renderSpellSlots(world.spell.cards, world.spell.cardsLimit);
+    renderLives(world.player.lives);
+    renderSpellSlots(world.spell.cards);
 
     const wv = world.waves;
     const actNames = ['一', '二', '三', '四'];
