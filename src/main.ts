@@ -32,11 +32,20 @@ async function main() {
   const stageEl = document.getElementById('stage')!;
   stageEl.appendChild(app.canvas);
 
+  // 把 HUD 元素搬进 #stage，这样它们的 absolute 定位能对齐画布。
+  // 留在 body 上会跑到页面角落，和战场错位。
+  for (const id of ['hud-top', 'hud-stage']) {
+    const el = document.getElementById(id);
+    if (el) stageEl.appendChild(el);
+  }
+
   const world = new World({ seed: 20261026 });
   const input = new Input();
   input.attach();
 
   const renderer = new GameRenderer(app, SCALE);
+  // 四幕背景需要先从 public/art 加载纹理
+  await renderer.initBackdrop();
   const loop = new FixedStep();
   const handUI = new HandUI(document.getElementById('hand-area')!);
 
@@ -104,7 +113,27 @@ async function main() {
   const hudCoins = document.getElementById('coins')!;
   const hudLives = document.getElementById('lives')!;
   const hudFps = document.getElementById('fps')!;
-  const hudSpell = document.getElementById('spell')!;
+  const hudSpellSlots = document.getElementById('spell-slots')!;
+
+  /**
+   * 渲染符卡槽：每格一张图，满/空切换。
+   * 只在数量变化时重建，避免每帧重排 DOM。
+   */
+  let lastSpellSig = '';
+  function renderSpellSlots(cards: number, limit: number): void {
+    const sig = `${cards}/${limit}`;
+    if (sig === lastSpellSig) return;
+    lastSpellSig = sig;
+
+    hudSpellSlots.innerHTML = '';
+    for (let i = 0; i < limit; i++) {
+      const img = document.createElement('img');
+      img.className = 'hud-spell-slot' + (i < cards ? '' : ' empty');
+      img.src = i < cards ? '/art/ui/spell_full.png' : '/art/ui/spell_empty.png';
+      img.alt = '';
+      hudSpellSlots.appendChild(img);
+    }
+  }
   const hudWave = document.getElementById('wave')!;
   const hudAct = document.getElementById('act')!;
   const hudTimer = document.getElementById('wave-timer')!;
@@ -226,6 +255,8 @@ async function main() {
       world.step();
     });
 
+    renderer.updateBackdrop(realDt);
+    renderer.setAct(world.currentAct);
     renderer.render(world);
     handUI.render(world.deck);
     pileViewer.syncCounts(world.deck.pile);
@@ -235,7 +266,7 @@ async function main() {
     hudScore.textContent = String(world.score);
     hudCoins.textContent = String(world.coins);
     hudLives.textContent = String(world.player.lives);
-    hudSpell.textContent = String(world.spell.cards);
+    renderSpellSlots(world.spell.cards, world.spell.cardsLimit);
 
     const wv = world.waves;
     const actNames = ['一', '二', '三', '四'];

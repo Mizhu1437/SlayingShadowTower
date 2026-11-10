@@ -5,7 +5,8 @@
  * 所有位置都在逻辑坐标系（384×448），由容器统一放大到屏幕。
  */
 
-import { Application, Container, Graphics, Text } from 'pixi.js';
+import { Application, Container, Graphics } from 'pixi.js';
+import { StageBackdrop } from './stageBackdrop';
 import type { World } from '../core/world';
 import { FIELD_W, FIELD_H } from '../core/world';
 import { PlayerShots } from '../core/shot/playerShots';
@@ -29,6 +30,11 @@ const COLORS = {
 
 export class GameRenderer {
   readonly root: Container;
+
+  /** 四幕背景与静止遮罩 */
+  private backdrop: StageBackdrop | null = null;
+  /** 素材加载前用的纯色底，加载完成后隐藏 */
+  private fallbackBg: Graphics | null = null;
   private readonly shotLayer: Container;
   private readonly enemyLayer: Container;
   private readonly bulletLayer: Container;
@@ -63,8 +69,6 @@ export class GameRenderer {
   private readonly SHOT_CAP = 1024;
   private readonly BULLET_CAP = 4096;
 
-  private scoreText!: Text;
-  private spellText!: Text;
 
   private readonly scale: number;
 
@@ -74,11 +78,14 @@ export class GameRenderer {
     this.root = new Container();
     this.root.scale.set(scale);
 
-    // 背景
+    // 兜底底色：素材加载完成前先垫一层，避免闪出画布底板色。
+    // 加载完成后必须隐藏它 —— 它是最底层，背景图层插在它下面，
+    // 如果留着会把背景完全挡住（第一次接入时就是这个原因导致背景看不见）。
     const bg = new Graphics()
       .rect(0, 0, FIELD_W, FIELD_H)
       .fill(COLORS.bg);
     this.root.addChild(bg);
+    this.fallbackBg = bg;
 
     // 场地边框
     const frame = new Graphics()
@@ -96,7 +103,6 @@ export class GameRenderer {
     this.buildCoinPool();
     this.buildBulletPool();
     this.buildPlayer();
-    this.buildHud();
 
     app.stage.addChild(this.root);
   }
@@ -277,36 +283,36 @@ export class GameRenderer {
     this.root.addChild(this.bombFlash);
   }
 
-  private buildHud(): void {
-    this.scoreText = new Text({
-      text: '',
-      style: {
-        fontFamily: 'Consolas, monospace',
-        fontSize: 9,
-        fill: 0x7d8aa8,
-      },
-    });
-    this.scoreText.position.set(6, 4);
-    this.root.addChild(this.scoreText);
-
-    // 符卡数量：放在得分文字右侧，避免与下方手牌区视觉冲突
-    this.spellText = new Text({
-      text: '',
-      style: {
-        fontFamily: 'Consolas, monospace',
-        fontSize: 9,
-        fill: 0xc79bff,
-      },
-    });
-    this.spellText.anchor.set(1, 0);
-    this.spellText.position.set(FIELD_W - 6, 4);
-    this.root.addChild(this.spellText);
+  /** 每帧同步一次 */
+  /**
+   * 初始化四幕背景。必须在 preload 之后调用。
+   *
+   * 背景层要插在 root 的**最底部**（场地边框之前），
+   * 否则会盖住弹幕。用 addChildAt(0) 而不是 addChild。
+   */
+  async initBackdrop(): Promise<void> {
+    const bd = new StageBackdrop();
+    await bd.preload();
+    bd.build();
+    this.root.addChildAt(bd.root, 0);
+    // 背景层在最底层，兜底底色必须让位
+    if (this.fallbackBg) this.fallbackBg.visible = false;
+    this.backdrop = bd;
   }
 
-  /** 符卡上限，用于绘制未填充的格子 */
-  private cardsLimit = 3;
+  /** 切幕：换背景纹理 */
+  setAct(act: number): void {
+    this.backdrop?.setAct(act);
+  }
 
-  /** 每帧同步一次 */
+  /**
+   * 每帧推进背景滚动。
+   * @param dt 距上一帧的秒数
+   */
+  updateBackdrop(dt: number): void {
+    this.backdrop?.update(dt);
+  }
+
   render(world: World): void {
     this.renderPlayer(world);
     this.renderShots(world);
@@ -529,21 +535,16 @@ export class GameRenderer {
     }
   }
 
-  private renderHud(world: World): void {
-    this.scoreText.text =
-      `SCORE ${world.score}   COIN ${world.coins}   KILL ${world.kills}`;
-
-    // 符卡指示移到 HUD 左上角区域（右下角会与手牌区视觉重叠）
-    const n = world.spell.cards;
-    if (n > 0) {
-      this.spellText.text = 'X ' + '◆'.repeat(n) + '◇'.repeat(Math.max(0, this.cardsLimit - n));
-      this.spellText.style.fill = world.spell.phase === 'deathbomb'
-        ? 0xff3b5c   // 决死时变红
-        : 0xc79bff;
-    } else {
-      this.spellText.text = '◇'.repeat(this.cardsLimit) + ' 无符卡';
-      this.spellText.style.fill = 0x55648a;
-    }
+  /**
+   * canvas 内的 HUD 文字已全部下放到 DOM。
+   *
+   * 为什么改：新布局要求右侧图标栏、战场内左上信息条，
+   * 这些用 DOM 画更合适（图标贴图、对齐、可访问性都更好），
+   * 而 canvas 文字会和它们重叠。这里只保留一个空实现占位，
+   * 将来若需要重新在 canvas 内画东西（如幕次横幅）也有地方落。
+   */
+  private renderHud(_world: World): void {
+    void _world;
   }
 
   /** 画布尺寸（含缩放） */

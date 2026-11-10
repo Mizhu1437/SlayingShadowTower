@@ -32,15 +32,67 @@
       pointer-events: none;
     }
 
-    #hud {
-      top: 14px;
-      left: 14px;
-      padding: 10px 14px;
-      min-width: 168px;
+    /* ── 右上角：图标化状态栏 ── */
+    #hud-top {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 30;
     }
-    .row { display: flex; justify-content: space-between; gap: 14px; }
-    .k { color: #7d8aa8; }
-    .v { color: #9fe3ff; font-weight: bold; }
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-icon {
+      width: 22px;
+      height: 22px;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 0 3px rgba(159, 227, 255, 0.4));
+    }
+    .hud-num {
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #9fe3ff;
+      text-shadow: 0 0 6px rgba(159, 227, 255, 0.5);
+      min-width: 18px;
+      text-align: right;
+    }
+    .hud-spell-slots {
+      display: flex;
+      gap: 3px;
+    }
+    .hud-spell-slot {
+      width: 26px;
+      height: 26px;
+      image-rendering: pixelated;
+      opacity: 0.95;
+    }
+    .hud-spell-slot.empty { opacity: 0.32; }
+
+    /* ── 战场内左上：幕 / 波次 / 倒计时 ── */
+    #hud-stage {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      pointer-events: none;
+      z-index: 30;
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: 12px;
+      color: #9fb4d0;
+      letter-spacing: 1px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    }
+    .stage-line { display: flex; align-items: center; gap: 6px; }
+    .stage-act { color: #c79bff; font-weight: 700; font-size: 14px; }
+    .stage-sep { color: #3a4a6a; }
+    .stage-timer { color: #9fe3ff; }
+    .stage-timer.urgent { color: #ff5c6e; font-weight: 700; }
 
     #help {
       bottom: 14px;
@@ -548,16 +600,37 @@
   <!-- 手牌与能量（DOM 实现，位于场地下方） -->
   <div id="hand-area"></div>
 
-  <div id="hud" class="panel">
-    <div class="row"><span class="k">残机</span><span class="v" id="lives">3</span></div>
-    <div class="row"><span class="k">符卡</span><span class="v" id="spell">3</span></div>
-    <div class="row"><span class="k">击破</span><span class="v" id="kills">0</span></div>
-    <div class="row"><span class="k">得分</span><span class="v" id="score">0</span></div>
-    <div class="row"><span class="k">蜃銭</span><span class="v" id="coins">0</span></div>
-    <div class="row"><span class="k">幕次</span><span class="v" id="act">—</span></div>
-    <div class="row"><span class="k">波次</span><span class="v" id="wave">—</span></div>
-    <div class="row"><span class="k">倒计时</span><span class="v" id="wave-timer">—</span></div>
-    <div class="row"><span class="k">FPS</span><span class="v" id="fps">—</span></div>
+  <!-- 右上：图标化状态栏 -->
+  <div id="hud-top">
+    <div class="hud-group" id="hud-life">
+      <img class="hud-icon" src="/art/ui/icon_life.png" alt="残机" />
+      <span class="hud-num" id="lives">3</span>
+    </div>
+    <div class="hud-group" id="hud-spell">
+      <div class="hud-spell-slots" id="spell-slots"></div>
+    </div>
+    <div class="hud-group" id="hud-coin">
+      <img class="hud-icon" src="/art/ui/coin_icon.png" alt="蜃銭" />
+      <span class="hud-num" id="coins">0</span>
+    </div>
+  </div>
+
+  <!-- 战场内左上：幕 / 波次 / 倒计时 -->
+  <div id="hud-stage">
+    <div class="stage-line">
+      <span class="stage-act" id="act">—</span>
+      <span class="stage-sep">·</span>
+      <span id="wave">—</span>
+      <span class="stage-sep">·</span>
+      <span class="stage-timer" id="wave-timer">—</span>
+    </div>
+  </div>
+
+  <!-- 隐藏的数据源（供 main.ts 读取，不显示） -->
+  <div id="hud-data" style="display:none">
+    <span id="kills">0</span>
+    <span id="score">0</span>
+    <span id="fps">—</span>
   </div>
 
   <div id="help" class="panel">
