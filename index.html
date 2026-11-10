@@ -214,7 +214,7 @@
     #hand-area {
       position: fixed;
       right: 16px;
-      bottom: 70px;
+      bottom: 48px;
       width: 420px;
       display: flex;
       flex-direction: column;
@@ -398,6 +398,137 @@
       width: 100%;
     }
     .hand-info.overload { color: #ff8fa3; }
+    /* ══ 新 HUD ══ */
+
+    /* 左上：幕次横幅 */
+    #act-banner {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateX(-215px);
+      width: 420px;
+      height: 48px;
+      pointer-events: none;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ab-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      opacity: 0.85;
+    }
+    .ab-text {
+      position: relative;
+      font-family: "Songti SC", "SimSun", serif;
+      font-size: 15px;
+      letter-spacing: 3px;
+      color: #ffe0c0;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+      white-space: nowrap;
+    }
+
+    /* 右上：单行状态 */
+    #top-status {
+      position: fixed;
+      top: 16px;
+      right: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 30;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+    .ts-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      white-space: nowrap;   /* 关键：所有项都在同一行，不换行 */
+    }
+    .ts-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ts-label {
+      font-size: 10px;
+      color: #7d8aa8;
+      letter-spacing: 1px;
+    }
+    .ts-num {
+      font-size: 17px;
+      font-weight: 700;
+      color: #9fe3ff;
+      text-shadow: 0 0 8px rgba(159, 227, 255, 0.45);
+    }
+    .ts-coin { width: 18px; height: 18px; image-rendering: pixelated; }
+
+    .ts-stars { display: flex; gap: 3px; }
+    .ts-stars .life-star {
+      width: 14px; height: 14px;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%,
+                         79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      background: linear-gradient(160deg, #ffe6a0, #ff9f5c);
+      filter: drop-shadow(0 0 4px rgba(255, 200, 120, 0.7));
+    }
+
+    .ts-spells { display: flex; gap: 3px; }
+    .ts-spells .spell-tag {
+      width: 11px; height: 22px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #e0c8ff, #9b6fd6);
+      box-shadow: 0 0 6px rgba(180, 140, 255, 0.65);
+    }
+
+    /* 波次行：WAVE 6/12 + 进度条 + 倒计时 */
+    .ts-wave-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .ts-wave-num { font-size: 11px; color: #9fb4d0; letter-spacing: 1px; }
+    .ts-wave-bar {
+      width: 120px; height: 5px;
+      background: #1a2238;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .ts-wave-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4a7ad0, #9fe3ff);
+      transition: width 0.15s linear;
+    }
+    .ts-timer { font-size: 13px; font-weight: 700; color: #9fe3ff; min-width: 46px; text-align: right; }
+    .ts-timer.urgent { color: #ff5c6e; animation: pulse-warn 0.8s ease-in-out infinite; }
+
+    /* 左下：灵力 + 符卡 */
+    /* 左下角自下而上：? 按钮(14) → 被动符卡(52) → 灵力/符卡(180) */
+    #bottom-left {
+      position: fixed;
+      left: 28px;
+      bottom: 188px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 26;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+    .bl-group { display: flex; align-items: center; gap: 8px; }
+    .bl-label { font-size: 10px; color: #7d8aa8; letter-spacing: 2px; min-width: 26px; }
+    .bl-pips { display: flex; gap: 4px; }
+    .bl-pips img { width: 22px; height: 22px; image-rendering: pixelated; }
+    .bl-spellbar { display: flex; gap: 4px; }
+    .bl-spellbar img { width: 30px; height: 30px; image-rendering: pixelated; }
+
     /* ── 商店界面 ── */
     .shop-overlay {
       position: fixed;
@@ -962,50 +1093,59 @@
   <!-- 手牌与能量（DOM 实现，位于场地下方） -->
   <div id="hand-area"></div>
 
-  <!-- 左侧面板：幕次 / 波次 / 倒计时 / 得分 -->
-  <aside id="panel-left" class="side-panel">
-    <div class="panel-block">
-      <div class="panel-label">幕次</div>
-      <div class="panel-act" id="act">—</div>
-    </div>
-    <div class="panel-block">
-      <div class="panel-label">波次</div>
-      <div class="panel-wave"><span id="wave">—</span></div>
-      <div class="panel-timer" id="wave-timer">—</div>
-    </div>
-    <div class="panel-block">
-      <div class="panel-label">得分</div>
-      <div class="panel-value" id="score">0</div>
-    </div>
-  </aside>
+  <!-- 左上：幕次横幅（借用 act_banner 素材，中央留白处写幕名） -->
+  <div id="act-banner">
+    <img class="ab-frame" id="act-banner-img" src="./art/ui/act_banner_1.png" alt="" />
+    <div class="ab-text" id="act-name">第一幕　妖怪之山 · 流言</div>
+  </div>
 
-  <!-- 右侧面板：残机 / 符卡 / 蜃銭 / 击破 -->
-  <aside id="panel-right" class="side-panel">
-    <div class="panel-block">
-      <div class="panel-label">残机</div>
-      <div class="lives-row" id="lives-row"></div>
-    </div>
-    <div class="panel-block">
-      <div class="panel-label">符卡</div>
-      <div class="spell-row" id="spell-row"></div>
-    </div>
-    <div class="panel-block">
-      <div class="panel-label">蜃銭</div>
-      <div class="coin-row">
-        <img class="coin-icon" src="./art/ui/coin_icon.png" alt="" />
-        <span class="panel-value" id="coins">0</span>
+  <!-- 右上：单行状态（图标 + 数字，不换行） -->
+  <div id="top-status">
+    <div class="ts-row">
+      <div class="ts-item">
+        <span class="ts-label">残机</span>
+        <span class="ts-stars" id="lives-row"></span>
+      </div>
+      <div class="ts-item">
+        <span class="ts-label">符卡</span>
+        <span class="ts-spells" id="spell-row"></span>
+      </div>
+      <div class="ts-item">
+        <img class="ts-coin" src="./art/ui/coin_icon.png" alt="" />
+        <span class="ts-num" id="coins">0</span>
+      </div>
+      <div class="ts-item">
+        <span class="ts-label">击破</span>
+        <span class="ts-num" id="kills">0</span>
+      </div>
+      <div class="ts-item">
+        <span class="ts-label">得分</span>
+        <span class="ts-num" id="score">0</span>
       </div>
     </div>
-    <div class="panel-block">
-      <div class="panel-label">击破</div>
-      <div class="panel-value" id="kills">0</div>
+    <div class="ts-wave-line">
+      <span class="ts-wave-num" id="wave">WAVE 1 / 12</span>
+      <div class="ts-wave-bar"><div class="ts-wave-fill" id="wave-bar"></div></div>
+      <span class="ts-timer" id="wave-timer">30.0s</span>
     </div>
-  </aside>
+  </div>
 
-  <!-- 隐藏的数据源（供 main.ts 读取，不显示） -->
+  <!-- 左下：灵力 + 符卡（参考图那种图标排，素材是现成的） -->
+  <div id="bottom-left">
+    <div class="bl-group">
+      <span class="bl-label">灵力</span>
+      <div class="bl-pips" id="energy-pips"></div>
+    </div>
+    <div class="bl-group">
+      <span class="bl-label">符卡</span>
+      <div class="bl-spellbar" id="spell-bar"></div>
+    </div>
+  </div>
+
+  <div id="hand-area"></div>
+
+  <!-- 隐藏数据源：fps 只用来看性能，不显示 -->
   <div id="hud-data" style="display:none">
-    <span id="kills">0</span>
-    <span id="score">0</span>
     <span id="fps">—</span>
   </div>
 

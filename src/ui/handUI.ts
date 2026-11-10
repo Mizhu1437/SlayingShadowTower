@@ -13,8 +13,6 @@ import type { Deck } from '../core/cards/deck';
 export class HandUI {
   private readonly root: HTMLElement;
   private readonly cardEls: HTMLElement[] = [];
-  private readonly energyEl: HTMLElement;
-  private readonly energyBarEl: HTMLElement;
   private readonly infoEl: HTMLElement;
   /** 手牌 N / 上限，贴在手牌区上方 */
   private readonly countEl: HTMLElement;
@@ -28,18 +26,8 @@ export class HandUI {
     this.root = document.createElement('div');
     this.root.className = 'hand-root';
 
-    // 能量条
-    const energyWrap = document.createElement('div');
-    energyWrap.className = 'energy-wrap';
-    this.energyEl = document.createElement('div');
-    this.energyEl.className = 'energy-pips';
-    energyWrap.appendChild(this.energyEl);
-
-    this.energyBarEl = document.createElement('div');
-    this.energyBarEl.className = 'energy-bar';
-    energyWrap.appendChild(this.energyBarEl);
-
-    host.appendChild(energyWrap);
+    // 能量与符卡已移到左下角（灵力 / 符卡图标排），
+    // 手牌区不再重复显示能量条。
 
     // 手牌数量 / 上限，贴在手牌区正上方
     this.countEl = document.createElement('div');
@@ -76,15 +64,9 @@ export class HandUI {
       this.lastSelected = deck.selected;
     }
 
-    // 能量
+    // 能量不在这里显示（左下角有灵力图标排），
+    // 但下面的状态提示仍需要进度来算倒计时
     const e = deck.energy;
-    let pips = '';
-    for (let i = 0; i < e.cap; i++) {
-      pips += `<span class="pip${i < e.value ? ' on' : ''}"></span>`;
-    }
-    this.energyEl.innerHTML = pips;
-    this.energyBarEl.style.setProperty('--w', `${(e.progress * 100).toFixed(1)}%`);
-    this.energyBarEl.classList.toggle('full', e.full);
 
     // 状态提示
     //

@@ -79,12 +79,17 @@ async function main() {
   // 外框整体缩放，战场就在 frame.fieldHost 里
   frame.root.scale.set(vp.scale);
 
-  // 战场居中：把 384 宽的战场摆在窗口水平正中
-  // （frame.root 的本地坐标系里，战场在 x=0..384）
+  // 战场**偏左**摆放：右侧要留出手牌区的空间。
+  //
+  // 手牌在右下角，宽约 420px。若战场居中，手牌会压在战场右缘上。
+  // 把战场重心左移，让右侧形成一条完整的"手牌 + 状态"竖栏，
+  // 同时左侧空出来的宽度正好放幕次横幅与被动区。
   const fieldW = FIELD_LOGICAL_W * vp.scale;
   const fieldH = FH * vp.scale;
+  const HAND_COLUMN = 430;         // 右侧竖栏预留宽度（px）
+  const x = Math.round((vp.vw - fieldW - HAND_COLUMN) / 2);
   frame.root.position.set(
-    Math.round((vp.vw - fieldW) / 2),
+    Math.max(24, x),
     Math.round((vp.vh - fieldH) / 2),
   );
 
@@ -224,9 +229,64 @@ async function main() {
       hudSpellRow.appendChild(d);
     }
   }
+  /**
+   * 灵力（能量）：用 energy_full/empty 素材排成一行菱形。
+   * 素材本身就是参考图里那种「灵力」图标，直接复用。
+   */
+  let lastEnergySig = '';
+  function renderEnergy(value: number, cap: number): void {
+    const sig = `${value}/${cap}`;
+    if (sig === lastEnergySig) return;
+    lastEnergySig = sig;
+
+    hudEnergyPips.innerHTML = '';
+    for (let i = 0; i < cap; i++) {
+      const img = document.createElement('img');
+      img.src = i < value
+        ? './art/ui/energy_full.png'
+        : './art/ui/energy_empty.png';
+      img.alt = '';
+      hudEnergyPips.appendChild(img);
+    }
+  }
+
+  /**
+   * 符卡：用 spell_full/empty 素材排一行。
+   * 与右上角的"剩余符卡"不同 —— 这里是完整槽位显示，
+   * 让玩家看到上限与当前值的对比。
+   */
+  let lastSpellBarSig = '';
+  function renderSpellBar(cards: number, limit: number): void {
+    const sig = `${cards}/${limit}`;
+    if (sig === lastSpellBarSig) return;
+    lastSpellBarSig = sig;
+
+    hudSpellBar.innerHTML = '';
+    for (let i = 0; i < limit; i++) {
+      const img = document.createElement('img');
+      img.src = i < cards
+        ? './art/ui/spell_full.png'
+        : './art/ui/spell_empty.png';
+      img.alt = '';
+      hudSpellBar.appendChild(img);
+    }
+  }
+
   const hudWave = document.getElementById('wave')!;
-  const hudAct = document.getElementById('act')!;
   const hudTimer = document.getElementById('wave-timer')!;
+  const hudWaveBar = document.getElementById('wave-bar')!;
+  const hudActName = document.getElementById('act-name')!;
+  const hudActBanner = document.getElementById('act-banner-img') as HTMLImageElement;
+  const hudEnergyPips = document.getElementById('energy-pips')!;
+  const hudSpellBar = document.getElementById('spell-bar')!;
+
+  /** 四幕场景名（用于幕次横幅） */
+  const ACT_SCENES = [
+    '妖怪之山 · 流言',
+    '塔内 · 影像',
+    '塔内 · 伪真',
+    '塔顶 · 剥落',
+  ];
 
   // ---------- 续关 / 结算面板 ----------
   const overlay = document.getElementById('overlay')!;
@@ -375,23 +435,37 @@ async function main() {
     hudCoins.textContent = String(world.coins);
     renderLives(world.player.lives);
     renderSpellSlots(world.spell.cards);
+    renderEnergy(world.deck.energy.value, world.deck.energy.cap);
+    renderSpellBar(world.spell.cards, world.spell.cardsLimit);
 
     const wv = world.waves;
     const actNames = ['一', '二', '三', '四'];
-    hudAct.textContent = actNames[world.currentAct] ?? String(world.currentAct + 1);
-    hudWave.textContent =
-      wv.phase === 'running' ? `${wv.currentWave}/${wv.totalWaves}`
-        : wv.phase === 'done' ? '完成'
-          : wv.isPausedMidway ? '整备' : '—';
+    const actName = actNames[world.currentAct] ?? String(world.currentAct + 1);
 
-    // 本波倒计时。剩余不足 10 秒时变红，提示即将超时清场。
+    // 幕次横幅：换文案 + 换横幅图（四幕配色不同）
+    const bannerText = `第${actName}幕　${ACT_SCENES[world.currentAct] ?? ''}`;
+    if (hudActName.textContent !== bannerText) {
+      hudActName.textContent = bannerText;
+      const idx = Math.min(4, world.currentAct + 1);
+      hudActBanner.src = `./art/ui/act_banner_${idx}.png`;
+    }
+
+    hudWave.textContent =
+      wv.phase === 'running' ? `WAVE ${wv.currentWave} / ${wv.totalWaves}`
+        : wv.phase === 'done' ? 'WAVE 完成'
+          : wv.isPausedMidway ? 'WAVE 整备' : 'WAVE —';
+
+    // 本波倒计时 + 进度条
     if (wv.phase === 'running') {
       const remain = wv.waveRemainSeconds;
+      const total = wv.currentWaveDef?.duration ?? 30;
       hudTimer.textContent = `${remain.toFixed(1)}s`;
       hudTimer.classList.toggle('urgent', remain <= 10 && remain > 0);
+      hudWaveBar.style.width = `${Math.max(0, Math.min(100, (1 - remain / total) * 100))}%`;
     } else {
       hudTimer.textContent = '—';
       hudTimer.classList.remove('urgent');
+      hudWaveBar.style.width = '0%';
     }
 
     // ── 幕间商店 ──
