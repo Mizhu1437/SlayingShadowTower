@@ -24,8 +24,10 @@ export class Input {
 
   private readonly onKeyDown = (e: KeyboardEvent) => {
     // 阻止方向键滚动页面
+    // Tab 在浏览器里默认会切换焦点，必须拦掉，否则按一次就跳出游戏。
     if (
-      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Tab']
+        .includes(e.key)
     ) {
       e.preventDefault();
     }

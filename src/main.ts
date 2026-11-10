@@ -8,22 +8,33 @@
  */
 
 import { Application } from 'pixi.js';
-import { World, FIELD_W, FIELD_H } from './core/world';
+import { World } from './core/world';
 import { FixedStep } from './core/loop';
 import { Input } from './render/input';
 import { GameRenderer } from './render/gameRenderer';
+import { FrameStage, FRAME_W, FIELD_H as FH } from './render/frameStage';
 import { HandUI } from './ui/handUI';
 import { ShopUI } from './ui/shopUI';
 import { DevConsole } from './ui/devConsole';
 import { PileViewer } from './ui/pileViewer';
+import { DeckOverlay } from './ui/deckOverlay';
 
-const SCALE = 1.6;
+/**
+ * 画面缩放。
+ *
+ * 从 1.6 降到 1.35：横版布局下画布宽 684 逻辑像素，
+ * 1.6 倍是 1094，加上两侧各 168 的面板就是 1430，
+ * 在 1400 宽窗口里会挤出屏幕。
+ * 1.35 倍得到 923，加面板 1251，1600×900 常见分辨率下放得开。
+ */
+const SCALE = 1.35;
 
 async function main() {
   const app = new Application();
   await app.init({
-    width: FIELD_W * SCALE,
-    height: FIELD_H * SCALE,
+    // 横版画面：战场 384 + 两侧各 150，共 684 逻辑宽
+    width: FRAME_W * SCALE,
+    height: FH * SCALE,
     background: '#05060c',
     antialias: false,
     preference: 'webgl',
@@ -43,9 +54,21 @@ async function main() {
   const input = new Input();
   input.attach();
 
-  const renderer = new GameRenderer(app, SCALE);
+  const frame = new FrameStage();
+  app.stage.addChild(frame.root);
+  // 外框整体缩放，战场就在 frame.fieldHost 里
+  frame.root.scale.set(SCALE);
+
+  const renderer = new GameRenderer(app, 1);
+  frame.fieldHost.addChild(renderer.root);
   // 四幕背景需要先从 public/art 加载纹理
   await renderer.initBackdrop();
+  // 用背景近景的边缘生成两侧虚化延伸，让横版画面连成一片
+  const farTex = renderer.backdropFarTexture;
+  if (farTex) {
+    frame.setEdgeSource(farTex);
+    frame.buildFieldBorder();
+  }
   const loop = new FixedStep();
   const handUI = new HandUI(document.getElementById('hand-area')!);
 
@@ -68,6 +91,7 @@ async function main() {
 
   // 牌堆查看（右下角三个按钮）
   const pileViewer = new PileViewer(document.body);
+  const deckOverlay = new DeckOverlay(document.body);
 
   // 开发者控制台：按 ~ 打开
   let consoleOpen = false;
@@ -111,13 +135,33 @@ async function main() {
   const hudKills = document.getElementById('kills')!;
   const hudScore = document.getElementById('score')!;
   const hudCoins = document.getElementById('coins')!;
-  const hudLives = document.getElementById('lives')!;
+  const hudLivesRow = document.getElementById('lives-row')!;
   const hudFps = document.getElementById('fps')!;
-  const hudSpellSlots = document.getElementById('spell-slots')!;
+  const hudSpellRow = document.getElementById('spell-row')!;
 
   /**
-   * 渲染符卡槽：每格一张图，满/空切换。
-   * 只在数量变化时重建，避免每帧重排 DOM。
+   * 残机：东方正作式的星形，每台一个。
+   * 不用"图标 + 数字"，因为一眼扫过就知道还剩几条命，
+   * 比读数字快得多 —— 这是弹幕游戏里生死攸关的信息。
+   */
+  let lastLivesSig = '';
+  function renderLives(lives: number, max: number): void {
+    const total = Math.max(max, lives);
+    const sig = `${lives}/${total}`;
+    if (sig === lastLivesSig) return;
+    lastLivesSig = sig;
+
+    hudLivesRow.innerHTML = '';
+    for (let i = 0; i < total; i++) {
+      const d = document.createElement('div');
+      d.className = 'life-star' + (i < lives ? '' : ' lost');
+      hudLivesRow.appendChild(d);
+    }
+  }
+
+  /**
+   * 符卡：竖长符札形，已用掉的变暗但仍占位。
+   * 同样不用数字 —— 符卡是稀缺资源，需要一眼看清还剩几张。
    */
   let lastSpellSig = '';
   function renderSpellSlots(cards: number, limit: number): void {
@@ -125,13 +169,11 @@ async function main() {
     if (sig === lastSpellSig) return;
     lastSpellSig = sig;
 
-    hudSpellSlots.innerHTML = '';
+    hudSpellRow.innerHTML = '';
     for (let i = 0; i < limit; i++) {
-      const img = document.createElement('img');
-      img.className = 'hud-spell-slot' + (i < cards ? '' : ' empty');
-      img.src = i < cards ? '/art/ui/spell_full.png' : '/art/ui/spell_empty.png';
-      img.alt = '';
-      hudSpellSlots.appendChild(img);
+      const d = document.createElement('div');
+      d.className = 'spell-tag' + (i < cards ? '' : ' empty');
+      hudSpellRow.appendChild(d);
     }
   }
   const hudWave = document.getElementById('wave')!;
@@ -248,12 +290,29 @@ async function main() {
     if (input.consume('x')) world.pressBomb();
     if (input.consume('c')) world.deck.cycleSelection();
     if (input.consume('z')) world.playSelectedCard();
+
+    // 牌堆查看：E 抽牌堆 / Q 弃牌堆 / Tab 卡组总览
+    if (input.consume('e')) pileViewer.toggle('draw', world.deck.pile);
+    if (input.consume('q')) pileViewer.toggle('discard', world.deck.pile);
+    if (input.consume('tab')) {
+      deckOverlay.toggle(
+        world.deck.pile.allCards(),
+        world.deck.passiveSlots,
+        world.deck.passives.length,
+      );
+    }
+
     input.clearPressed();
 
-    // 固定步推进
-    loop.advance(realDt, () => {
-      world.step();
-    });
+    // 固定步推进。卡组总览打开时暂停 —— 那是玩家做长期规划的时刻，
+    // 需要完整注意力，不能边躲弹边看牌组。
+    if (!deckOverlay.isOpen) {
+      loop.advance(realDt, () => {
+        world.step();
+      });
+    } else {
+      lastT = performance.now();   // 避免关闭后一次性补很多帧
+    }
 
     renderer.updateBackdrop(realDt);
     renderer.setAct(world.currentAct);
@@ -265,7 +324,7 @@ async function main() {
     hudKills.textContent = String(world.kills);
     hudScore.textContent = String(world.score);
     hudCoins.textContent = String(world.coins);
-    hudLives.textContent = String(world.player.lives);
+    renderLives(world.player.lives, world.player.cfg.lives);
     renderSpellSlots(world.spell.cards, world.spell.cardsLimit);
 
     const wv = world.waves;
@@ -319,6 +378,8 @@ async function main() {
   });
 
   (window as unknown as { __world: World }).__world = world;
+  (window as unknown as { __pixiApp: unknown }).__pixiApp = app;
+  (window as unknown as { __frame: unknown }).__frame = frame;
 }
 
 main().catch((err) => {

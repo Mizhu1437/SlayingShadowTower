@@ -139,6 +139,17 @@ export class StageBackdrop {
     this.near.tilePosition.y += LAYER_SPEED[2] * BASE_SCROLL * dt;
   }
 
+  /**
+   * 当前幕的远景纹理（供横版外框生成两侧延伸）。
+   *
+   * 为什么用远景而不是近景：近景层几乎全透明（平均亮度约 1），
+   * 拿它做边缘延伸会得到一片黑。远景是天空，不透明且有颜色，
+   * 横向拉伸后正好是"背景向两侧自然延伸"的效果。
+   */
+  get farTexture(): Texture | null {
+    return this.far?.texture ?? null;
+  }
+
   /** 当前幕（1 起） */
   get act(): number {
     return this.currentAct;

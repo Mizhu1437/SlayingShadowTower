@@ -300,6 +300,11 @@ export class GameRenderer {
     this.backdrop = bd;
   }
 
+  /** 当前背景的远景纹理（供横版外框做两侧延伸） */
+  get backdropFarTexture() {
+    return this.backdrop?.farTexture ?? null;
+  }
+
   /** 切幕：换背景纹理 */
   setAct(act: number): void {
     this.backdrop?.setAct(act);

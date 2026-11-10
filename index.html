@@ -590,6 +590,196 @@
 
     #wave-timer.urgent { color: #ff5c6e; font-weight: 700; }
 
+    /* ── 横版两侧面板 ── */
+    /* 战场固定 384 宽，两侧各 150。面板贴边排布，不覆盖战场。 */
+    /* 面板贴着战场两侧，垂直方向上居中于战场 */
+    .side-panel {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 168px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      pointer-events: none;
+      z-index: 30;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+    /*
+     * 战场总宽 1094（684 逻辑 ×1.6），半宽 547。
+     * 面板要贴在战场**外侧**，再留 12px 间隙。
+     * 之前用 307（=192×1.6）算错了：那是战场「内容」半宽，
+     * 不是整个画布半宽，结果面板压进了战场里。
+     */
+    #panel-left {
+      left: calc(50% - 462px - 168px - 10px);
+      align-items: flex-start;
+    }
+    #panel-right {
+      right: calc(50% - 462px - 168px - 10px);
+      align-items: flex-end;
+    }
+
+    .panel-block { display: flex; flex-direction: column; gap: 4px; }
+    #panel-right .panel-block { align-items: flex-end; }
+
+    .panel-label {
+      font-size: 10px;
+      color: #6f7d9c;
+      letter-spacing: 2px;
+    }
+    .panel-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #9fe3ff;
+      text-shadow: 0 0 8px rgba(159, 227, 255, 0.45);
+    }
+    .panel-act {
+      font-size: 26px;
+      font-weight: 700;
+      color: #c79bff;
+      text-shadow: 0 0 10px rgba(199, 155, 255, 0.5);
+      line-height: 1;
+    }
+    .panel-wave {
+      font-size: 15px;
+      color: #b8d4ee;
+      letter-spacing: 1px;
+    }
+    .panel-timer {
+      font-size: 19px;
+      font-weight: 700;
+      color: #9fe3ff;
+      text-shadow: 0 0 8px rgba(159, 227, 255, 0.4);
+    }
+    .panel-timer.urgent {
+      color: #ff5c6e;
+      text-shadow: 0 0 10px rgba(255, 92, 110, 0.6);
+      animation: pulse-warn 0.8s ease-in-out infinite;
+    }
+    @keyframes pulse-warn {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+
+    /* 残机：东方正作式的小星形，每台一个 */
+    .lives-row { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+    .life-star {
+      width: 15px;
+      height: 15px;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%,
+                         79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      background: linear-gradient(160deg, #ffe6a0, #ff9f5c);
+      filter: drop-shadow(0 0 4px rgba(255, 200, 120, 0.7));
+    }
+    .life-star.lost { background: #2a3350; filter: none; opacity: 0.45; }
+
+    /* 符卡：竖长符札形 */
+    .spell-row { display: flex; gap: 5px; justify-content: flex-end; }
+    .spell-tag {
+      width: 13px;
+      height: 26px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #e0c8ff, #9b6fd6);
+      box-shadow: 0 0 6px rgba(180, 140, 255, 0.65);
+      position: relative;
+    }
+    .spell-tag::after {
+      content: '';
+      position: absolute;
+      left: 50%; top: 5px; bottom: 5px;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.5);
+      transform: translateX(-50%);
+    }
+    .spell-tag.empty {
+      background: #232a44;
+      box-shadow: none;
+      opacity: 0.5;
+    }
+    .spell-tag.empty::after { background: rgba(255,255,255,0.12); }
+
+    .coin-row { display: flex; align-items: center; gap: 6px; }
+    .coin-icon { width: 20px; height: 20px; image-rendering: pixelated; }
+
+    /* ── 卡组总览（Tab） ── */
+    .deck-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 6, 12, 0.88);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 120;
+    }
+    .deck-overlay.hidden { display: none; }
+
+    .deck-panel {
+      width: min(900px, 92vw);
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      background: #0a0d18;
+      border: 1px solid #2a3350;
+      border-radius: 8px;
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.85);
+      overflow: hidden;
+    }
+    .deck-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 14px 20px;
+      border-bottom: 1px solid #1e2740;
+    }
+    .deck-title { font-size: 17px; color: #c79bff; letter-spacing: 3px; }
+    .deck-close-hint { font-size: 11px; color: #55607a; }
+
+    .deck-stats {
+      display: flex;
+      gap: 26px;
+      padding: 10px 20px;
+      font-size: 12px;
+      color: #8794b0;
+      border-bottom: 1px solid #161d31;
+    }
+    .deck-stats b { color: #9fe3ff; font-size: 14px; margin: 0 2px; }
+
+    .deck-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      gap: 8px;
+      padding: 16px 20px;
+      overflow-y: auto;
+    }
+    .deck-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 9px 10px;
+      min-height: 96px;
+      background: #12172a;
+      border: 1px solid #26304d;
+      border-left: 3px solid #6b8cff;
+      border-radius: 4px;
+    }
+    .deck-card.passive { border-left-color: #c79bff; background: #171228; }
+    .dc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+    .dc-name { font-size: 13px; color: #e8eeff; font-weight: 600; }
+    .dc-count { font-size: 11px; color: #ffd479; }
+    .dc-cost { font-size: 10px; color: #7fd8ff; }
+    .dc-text { font-size: 10px; color: #8a97b4; line-height: 1.5; flex: 1; }
+    .deck-empty { color: #55607a; padding: 30px; text-align: center; grid-column: 1/-1; }
+
+    .deck-foot {
+      padding: 8px 20px;
+      border-top: 1px solid #1e2740;
+      font-size: 11px;
+      color: #6f7d9c;
+      text-align: center;
+    }
+
   </style>
 </head>
 <body>
@@ -600,31 +790,45 @@
   <!-- 手牌与能量（DOM 实现，位于场地下方） -->
   <div id="hand-area"></div>
 
-  <!-- 右上：图标化状态栏 -->
-  <div id="hud-top">
-    <div class="hud-group" id="hud-life">
-      <img class="hud-icon" src="/art/ui/icon_life.png" alt="残机" />
-      <span class="hud-num" id="lives">3</span>
+  <!-- 左侧面板：幕次 / 波次 / 倒计时 / 得分 -->
+  <aside id="panel-left" class="side-panel">
+    <div class="panel-block">
+      <div class="panel-label">幕次</div>
+      <div class="panel-act" id="act">—</div>
     </div>
-    <div class="hud-group" id="hud-spell">
-      <div class="hud-spell-slots" id="spell-slots"></div>
+    <div class="panel-block">
+      <div class="panel-label">波次</div>
+      <div class="panel-wave"><span id="wave">—</span></div>
+      <div class="panel-timer" id="wave-timer">—</div>
     </div>
-    <div class="hud-group" id="hud-coin">
-      <img class="hud-icon" src="/art/ui/coin_icon.png" alt="蜃銭" />
-      <span class="hud-num" id="coins">0</span>
+    <div class="panel-block">
+      <div class="panel-label">得分</div>
+      <div class="panel-value" id="score">0</div>
     </div>
-  </div>
+  </aside>
 
-  <!-- 战场内左上：幕 / 波次 / 倒计时 -->
-  <div id="hud-stage">
-    <div class="stage-line">
-      <span class="stage-act" id="act">—</span>
-      <span class="stage-sep">·</span>
-      <span id="wave">—</span>
-      <span class="stage-sep">·</span>
-      <span class="stage-timer" id="wave-timer">—</span>
+  <!-- 右侧面板：残机 / 符卡 / 蜃銭 / 击破 -->
+  <aside id="panel-right" class="side-panel">
+    <div class="panel-block">
+      <div class="panel-label">残机</div>
+      <div class="lives-row" id="lives-row"></div>
     </div>
-  </div>
+    <div class="panel-block">
+      <div class="panel-label">符卡</div>
+      <div class="spell-row" id="spell-row"></div>
+    </div>
+    <div class="panel-block">
+      <div class="panel-label">蜃銭</div>
+      <div class="coin-row">
+        <img class="coin-icon" src="./art/ui/coin_icon.png" alt="" />
+        <span class="panel-value" id="coins">0</span>
+      </div>
+    </div>
+    <div class="panel-block">
+      <div class="panel-label">击破</div>
+      <div class="panel-value" id="kills">0</div>
+    </div>
+  </aside>
 
   <!-- 隐藏的数据源（供 main.ts 读取，不显示） -->
   <div id="hud-data" style="display:none">
