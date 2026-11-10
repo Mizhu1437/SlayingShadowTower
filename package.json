@@ -12,7 +12,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "tsx tests/bench/index.ts"
+    "bench": "tsx tests/bench/index.ts",
+    "art": "python tools/cardart.py",
+    "art:stage": "python tools/stage_build.py",
+    "art:ui": "python tools/uiart.py",
+    "art:all": "python tools/cardart.py && python tools/stage_build.py && python tools/uiart.py"
   },
   "dependencies": {
     "pixi.js": "^8.6.6"
