@@ -108,6 +108,7 @@
     }
     #help-toggle:hover { color: #9fe3ff; border-color: #4a6a9a; }
 
+    /* ? 按钮占左下角最底部，被动区叠在它上面 */
     #help {
       bottom: 14px;
       left: 14px;
@@ -885,6 +886,71 @@
       margin-bottom: 2px;
     }
     .hand-count::first-letter { color: #6f7d9c; }
+
+    /* ── 左下角：被动符卡区 ── */
+    #passive-slots {
+      position: fixed;
+      left: calc(50% - 462px - 168px - 10px);
+      bottom: 46px;
+      width: 168px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      pointer-events: none;
+      z-index: 26;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+    .ps-title {
+      font-size: 10px;
+      color: #6f7d9c;
+      letter-spacing: 2px;
+    }
+    .ps-row {
+      display: flex;
+      gap: 6px;
+    }
+    .ps-slot {
+      width: 62px;
+      height: 86px;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    /* 已装备：卡图 + 名称 */
+    .ps-slot.filled {
+      background: #171228;
+      border: 1px solid #6b4a9e;
+      box-shadow: 0 0 10px rgba(199, 155, 255, 0.28);
+    }
+    .ps-slot.filled img {
+      width: 100%;
+      height: 62px;
+      object-fit: cover;
+      display: block;
+    }
+    .ps-name {
+      font-size: 9px;
+      color: #d8c8f0;
+      padding: 2px 4px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* 空槽：虚线虚位，明确"这里还没有东西" */
+    .ps-slot.empty {
+      border: 1px dashed #2e3a58;
+      background: rgba(12, 16, 28, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .ps-plus {
+      font-size: 22px;
+      color: #33405e;
+      line-height: 1;
+    }
 
   </style>
 </head>

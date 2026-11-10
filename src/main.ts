@@ -18,6 +18,7 @@ import { ShopUI } from './ui/shopUI';
 import { DevConsole } from './ui/devConsole';
 import { PileViewer } from './ui/pileViewer';
 import { DeckOverlay } from './ui/deckOverlay';
+import { PassiveSlotsUI } from './ui/passiveSlotsUI';
 
 /**
  * 画面缩放。
@@ -98,6 +99,7 @@ async function main() {
   // 牌堆查看（右下角三个按钮）
   const pileViewer = new PileViewer(document.body);
   const deckOverlay = new DeckOverlay(document.body);
+  const passiveUI = new PassiveSlotsUI(document.body);
 
   // 开发者控制台：按 ~ 打开
   let consoleOpen = false;
@@ -335,6 +337,7 @@ async function main() {
     renderer.render(world);
     handUI.render(world.deck);
     pileViewer.syncCounts(world.deck.pile);
+    passiveUI.render(world.deck.passives, world.deck.passiveSlots);
 
     // HUD
     hudKills.textContent = String(world.kills);
