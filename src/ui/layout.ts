@@ -23,16 +23,16 @@ export const FIELD_H = 448;
  * 不能写死比例（大屏时手牌也会跟着放大）。
  */
 const RATIO = {
-  top: 0.07,      // 幕次横幅留白
-  bar: 0.05,      // 底部按钮留白
+  top: 0.055,     // 幕次横幅留白
+  bar: 0.04,      // 底部按钮留白
 } as const;
 
 /** 底部区块的高度基准（px @ uiScale=1） */
 const BOTTOM_BASE = {
-  spirit: 40,     // 灵力 + 符卡
-  hand: 168,      // 手牌卡片
-  count: 22,      // 手牌数量行
-  gaps: 18,
+  spirit: 34,     // 灵力 + 符卡
+  hand: 152,      // 手牌卡片
+  count: 18,      // 手牌数量行
+  gaps: 12,
 } as const;
 
 /**
@@ -78,9 +78,15 @@ export function computeLayout(): Layout {
   // 战场可用的高度 = 视口 - 顶部 - 底部区块 - 按钮区
   const availH = Math.max(200, vh - topZone - bottomNeeded - barZone);
 
-  // 高度决定主缩放；同时限制宽度不超过视口 46%（两侧留白给状态面板）
+  /*
+   * 主缩放 = 高度能塞下的最大倍数。
+   *
+   * 早期还额外限制了「宽度不超过视口 46%」，那是为了给两侧状态面板留位。
+   * 但实际战场上下的留白已经足够，横向再卡 46% 只会让战场无谓变小。
+   * 现在宽度上限放宽到 62%，让战场尽量吃满可用高度。
+   */
   const byH = availH / FIELD_H;
-  const byW = (vw * 0.46) / FIELD_W;
+  const byW = (vw * 0.62) / FIELD_W;
   const scale = Math.max(0.55, Math.min(byH, byW));
 
   const fieldW = Math.round(FIELD_W * scale);

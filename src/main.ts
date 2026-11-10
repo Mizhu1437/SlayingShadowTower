@@ -52,8 +52,12 @@ async function main() {
   const stageEl = document.getElementById('stage')!;
   stageEl.appendChild(app.canvas);
 
-  // 把 HUD 元素搬进 #stage，这样它们的 absolute 定位能对齐画布。
-  // 留在 body 上会跑到页面角落，和战场错位。
+  // HUD 元素搬进 #stage。
+  //
+  // 为什么必须搬：canvas 在 #stage 里，而 #stage 是 position:relative
+  // 会形成层叠上下文。留在 body 上的元素即使 z-index 更高，
+  // 也可能被 canvas 盖住（field-timer 就踩过这个坑：DOM 存在、
+  // 计算样式可见，但画面上看不到）。
   for (const id of ['hud-top', 'hud-stage']) {
     const el = document.getElementById(id);
     if (el) stageEl.appendChild(el);
@@ -113,6 +117,15 @@ async function main() {
       bar.style.bottom = `${Math.round(14 * v.uiScale)}px`;
       bar.style.justifyContent = 'space-between';
     }
+
+    // 状态栏：贴在战场右缘外，垂直居中偏上
+    const status = document.getElementById('top-status');
+    if (status) {
+      const gap = Math.round(28 * v.uiScale);
+      status.style.left = `${v.fieldX + v.fieldW + gap}px`;
+      status.style.right = 'auto';
+      status.style.top = `${Math.round(v.fieldY + v.fieldH * 0.28)}px`;
+    }
   }
   syncLayout();
   window.addEventListener('resize', syncLayout);
@@ -121,6 +134,7 @@ async function main() {
   frame.fieldHost.addChild(renderer.root);
   // 四幕背景需要先从 public/art 加载纹理
   await renderer.initBackdrop();
+  renderer.initFieldTimer();
   // 两侧延伸铺满窗口剩余空间
   const farTex = renderer.backdropFarTexture;
   // 视口剩余宽度 / 2，再除以缩放 = 单侧逻辑宽度
@@ -291,8 +305,47 @@ async function main() {
   }
 
   const hudWave = document.getElementById('wave')!;
-  const hudTimer = document.getElementById('wave-timer')!;
   const hudWaveBar = document.getElementById('wave-bar')!;
+  /** 上一次播放警告音时的整秒数，避免同一秒重复响 */
+  let lastWarnSecond = -1;
+
+  /**
+   * 倒计时警告音。
+   *
+   * 用 WebAudio 现场合成，不依赖音频素材：
+   * 一个短促的方波「嘀」，音量压得很低（0.06），
+   * 只作为节奏提示，不该盖过玩家注意力。
+   */
+  let audioCtx: AudioContext | null = null;
+  function playWarningBeep(): void {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext
+          || (window as unknown as { webkitAudioContext: typeof AudioContext })
+            .webkitAudioContext)();
+      }
+      const ctx = audioCtx;
+      if (ctx.state === 'suspended') void ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+
+      // 极短包络，避免爆音
+      const t = ctx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.06, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    } catch {
+      // 音频不可用（浏览器策略/无设备）时静默跳过，不影响游戏
+    }
+  }
   const hudActName = document.getElementById('act-name')!;
   const hudActBanner = document.getElementById('act-banner-img') as HTMLImageElement;
   const hudEnergyPips = document.getElementById('energy-pips')!;
@@ -473,17 +526,46 @@ async function main() {
         : wv.phase === 'done' ? 'WAVE 完成'
           : wv.isPausedMidway ? 'WAVE 整备' : 'WAVE —';
 
-    // 本波倒计时 + 进度条
+    // 波次进度条（右侧状态栏里的细条，始终显示）
     if (wv.phase === 'running') {
       const remain = wv.waveRemainSeconds;
       const total = wv.currentWaveDef?.duration ?? 30;
-      hudTimer.textContent = `${remain.toFixed(1)}s`;
-      hudTimer.classList.toggle('urgent', remain <= 10 && remain > 0);
       hudWaveBar.style.width = `${Math.max(0, Math.min(100, (1 - remain / total) * 100))}%`;
     } else {
-      hudTimer.textContent = '—';
-      hudTimer.classList.remove('urgent');
       hudWaveBar.style.width = '0%';
+    }
+
+    /*
+     * 战斗框内倒计时：只在两种情况下出现
+     *   1. 道中/精英波，剩余 ≤ 10 秒（即将超时清场）
+     *   2. BOSS / 道中 BOSS 波，全程显示
+     *
+     * 精确到 1 秒（向上取整），≤10 秒时变红并每秒响一声警告。
+     * 常规波次不显示 —— 平时的战斗节奏不该被倒计时干扰。
+     */
+    const waveDef = wv.currentWaveDef;
+    const isBossWave = waveDef?.kind === 'boss' || waveDef?.kind === 'midboss';
+    const remainSec = wv.waveRemainSeconds;
+
+    if (wv.phase === 'running' && waveDef) {
+      const showTimer = isBossWave || remainSec <= 10;
+      if (showTimer) {
+        const sec = Math.max(0, Math.ceil(remainSec));
+        const warn = remainSec <= 10;
+        renderer.setFieldTimer(sec, warn);
+
+        // 每秒一声警告（只在 ≤10 秒时）
+        if (warn && sec !== lastWarnSecond) {
+          lastWarnSecond = sec;
+          playWarningBeep();
+        }
+      } else {
+        renderer.setFieldTimer(null, false);
+        lastWarnSecond = -1;
+      }
+    } else {
+      renderer.setFieldTimer(null, false);
+      lastWarnSecond = -1;
     }
 
     // ── 幕间商店 ──

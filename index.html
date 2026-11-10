@@ -20,8 +20,21 @@
       overflow: hidden;
       user-select: none;
     }
-    #stage { position: relative; flex-shrink: 0; }
-    #stage canvas { display: block; }
+    /*
+     * #stage 显式建立层叠上下文（z-index:0）。
+     *
+     * 不设时 canvas 会与 body 上的 fixed 元素产生歧义：
+     * field-timer 在 body 末尾、z-index 45，却被 canvas 盖住。
+     * 给 #stage 一个明确的低层级后，body 上 z-index>0 的元素才能稳定浮在上面。
+     */
+    #stage { position: relative; flex-shrink: 0; z-index: 0; }
+    /*
+     * canvas 必须显式设 z-index:0。
+     * 它带 position 参与定位，不设 z-index 时在层叠顺序上
+     * 可能与后插入的 DOM 元素产生歧义 —— 实测 field-timer
+     * 明明 DOM 在前、样式可见，却被 canvas 盖住。
+     */
+    #stage canvas { display: block; position: relative; z-index: 0; }
 
     .panel {
       position: fixed;
@@ -437,10 +450,11 @@
     }
 
     /* 右侧空白区：状态列表，垂直居中偏上 */
+    /* 位置由 main.ts 的 syncLayout 按战场矩形计算 */
     #top-status {
       position: fixed;
-      right: 6%;
-      top: 30%;
+      right: auto;
+      top: auto;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -1102,6 +1116,35 @@
       line-height: 1;
     }
 
+    /* 战斗框内右上角倒计时：仅道中 10s 内或 BOSS 战显示 */
+    #field-timer {
+      position: fixed;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: calc(30px * var(--ui-scale, 1));
+      font-weight: 700;
+      color: #ffd479;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+      letter-spacing: 1px;
+      pointer-events: none;
+      z-index: 45;
+      /* 位置由 JS 设为战斗框右缘内侧，用 translateX(-100%) 让它向左展开 */
+      transform: translateX(-100%);
+      padding: 2px 6px;
+    }
+    #field-timer.hidden { display: none; }
+    #field-timer.warn {
+      color: #ff4d5e;
+      text-shadow: 0 0 14px rgba(255, 77, 94, 0.8);
+      animation: timer-pulse 1s steps(2, end) infinite;
+    }
+    @keyframes timer-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
   </style>
 </head>
 <body>
@@ -1110,7 +1153,6 @@
   <div id="title">東方戮影塔 〜 Formless Barrage</div>
 
   <!-- 手牌与能量（DOM 实现，位于场地下方） -->
-  <div id="hand-area"></div>
 
   <!-- 左上：幕次横幅（借用 act_banner 素材，中央留白处写幕名） -->
   <div id="act-banner">
@@ -1145,7 +1187,6 @@
     <div class="ts-wave-block">
       <div class="ts-wave-num" id="wave">WAVE 1 / 12</div>
       <div class="ts-wave-bar"><div class="ts-wave-fill" id="wave-bar"></div></div>
-      <div class="ts-timer" id="wave-timer">30.0s</div>
     </div>
   </div>
 
@@ -1161,16 +1202,14 @@
     </div>
   </div>
 
+  <!-- 战斗框内右上角：仅道中倒计时 10s 内或 BOSS 战显示 -->
+  <div id="field-timer" class="hidden">10</div>
+
   <div id="hand-area"></div>
 
   <!-- 隐藏数据源：fps 只用来看性能，不显示 -->
   <div id="hud-data" style="display:none">
     <span id="fps">—</span>
-  </div>
-
-      <div><kbd>E</kbd> 抽牌堆　<kbd>Q</kbd> 弃牌堆　<kbd>Tab</kbd> 卡组</div>
-    </div>
-  </div>
   </div>
 
   <div id="overlay" class="hidden">

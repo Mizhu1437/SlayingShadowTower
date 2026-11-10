@@ -5,7 +5,7 @@
  * 所有位置都在逻辑坐标系（384×448），由容器统一放大到屏幕。
  */
 
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Text } from 'pixi.js';
 import { StageBackdrop } from './stageBackdrop';
 import type { World } from '../core/world';
 import { FIELD_W, FIELD_H } from '../core/world';
@@ -35,6 +35,17 @@ export class GameRenderer {
   private backdrop: StageBackdrop | null = null;
   /** 素材加载前用的纯色底，加载完成后隐藏 */
   private fallbackBg: Graphics | null = null;
+
+  /**
+   * 战斗框内的波次倒计时。
+   *
+   * 为什么画在 canvas 里而不是用 DOM：
+   * DOM 版本放在 body 上，会被 canvas 遮挡（层叠上下文问题，
+   * 试过调 z-index / 移入 #stage 都不行）；
+   * 而 canvas 内的 Text 天然处于场景图最上层，不受此影响。
+   */
+  private fieldTimerText!: Text;
+  private lastTimerSec = -1;
   private readonly shotLayer: Container;
   private readonly enemyLayer: Container;
   private readonly bulletLayer: Container;
@@ -303,6 +314,52 @@ export class GameRenderer {
   /** 当前背景的远景纹理（供横版外框做两侧延伸） */
   get backdropFarTexture() {
     return this.backdrop?.farTexture ?? null;
+  }
+
+  /** 创建战斗框内的倒计时 Text（放在最上层） */
+  initFieldTimer(): void {
+    this.fieldTimerText = new Text({
+      text: '',
+      style: {
+        fontFamily: 'Consolas, Menlo, monospace',
+        fontSize: 30,
+        fontWeight: '700',
+        fill: 0xffd479,
+        stroke: { color: 0x000000, width: 4 },
+        dropShadow: { color: 0x000000, blur: 6, distance: 2, alpha: 0.9 },
+      },
+    });
+    this.fieldTimerText.anchor.set(1, 0);   // 右上角对齐
+    // 贴在战场右上角内侧
+    this.fieldTimerText.position.set(FIELD_W - 14, 12);
+    this.fieldTimerText.visible = false;
+    this.root.addChild(this.fieldTimerText);
+  }
+
+  /**
+   * 更新战斗框内倒计时。
+   *
+   * @param sec 剩余整秒；null 表示隐藏
+   * @param warn 是否进入警告状态（变红）
+   */
+  setFieldTimer(sec: number | null, warn: boolean): void {
+    if (!this.fieldTimerText) return;
+
+    if (sec === null) {
+      this.fieldTimerText.visible = false;
+      this.lastTimerSec = -1;
+      return;
+    }
+
+    this.fieldTimerText.visible = true;
+    if (sec !== this.lastTimerSec) {
+      this.lastTimerSec = sec;
+      this.fieldTimerText.text = String(sec);
+    }
+    this.fieldTimerText.style.fill = warn ? 0xff4d5e : 0xffd479;
+    // 警告时轻微放大脉动
+    const k = warn ? 1 + 0.06 * Math.sin(performance.now() / 160) : 1;
+    this.fieldTimerText.scale.set(k);
   }
 
   /** 切幕：换背景纹理 */
