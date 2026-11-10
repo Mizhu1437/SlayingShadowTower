@@ -287,8 +287,8 @@
     }
 
     .card {
-      width: 92px;
-      height: 152px;
+      width: calc(92px * var(--ui-scale, 1));
+      height: calc(152px * var(--ui-scale, 1));
       background: linear-gradient(160deg, #141a2b, #0e1320);
       border: 1px solid #2f3b5c;
       border-radius: 6px;
@@ -362,13 +362,13 @@
     }
     .card .card-name {
       padding: 3px 5px 0;
-      font-size: 11px;
+      font-size: calc(11px * var(--ui-scale, 1));
       line-height: 1.2;
       flex-shrink: 0;
     }
     .card .card-text {
       padding: 0 5px 4px;
-      font-size: 9px;
+      font-size: calc(9px * var(--ui-scale, 1));
       line-height: 1.35;
       color: #8794b0;
       display: -webkit-box;
@@ -409,7 +409,7 @@
       position: fixed;
       top: 18px;
       left: 50%;
-      transform: translateX(-50%) translateX(-215px);
+      transform: translateX(-50%);
       width: 420px;
       height: 48px;
       pointer-events: none;
@@ -429,7 +429,7 @@
     .ab-text {
       position: relative;
       font-family: "Songti SC", "SimSun", serif;
-      font-size: 15px;
+      font-size: calc(15px * var(--ui-scale, 1));
       letter-spacing: 3px;
       color: #ffe0c0;
       text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
@@ -457,13 +457,13 @@
       min-width: 150px;
     }
     .ts-label {
-      font-size: 11px;
+      font-size: calc(11px * var(--ui-scale, 1));
       color: #7d8aa8;
       letter-spacing: 2px;
-      min-width: 34px;
+      min-width: calc(34px * var(--ui-scale, 1));
     }
     .ts-num {
-      font-size: 19px;
+      font-size: calc(19px * var(--ui-scale, 1));
       font-weight: 700;
       color: #9fe3ff;
       text-shadow: 0 0 8px rgba(159, 227, 255, 0.45);
@@ -472,7 +472,7 @@
 
     .ts-stars { display: flex; gap: 4px; }
     .ts-stars .life-star {
-      width: 16px; height: 16px;
+      width: calc(16px * var(--ui-scale, 1)); height: calc(16px * var(--ui-scale, 1));
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%,
                          79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
       background: linear-gradient(160deg, #ffe6a0, #ff9f5c);
@@ -481,7 +481,7 @@
 
     .ts-spells { display: flex; gap: 4px; }
     .ts-spells .spell-tag {
-      width: 12px; height: 24px;
+      width: calc(12px * var(--ui-scale, 1)); height: calc(24px * var(--ui-scale, 1));
       border-radius: 2px;
       background: linear-gradient(180deg, #e0c8ff, #9b6fd6);
       box-shadow: 0 0 6px rgba(180, 140, 255, 0.65);
@@ -503,9 +503,9 @@
       gap: 8px;
       white-space: nowrap;
     }
-    .ts-wave-num { font-size: 11px; color: #9fb4d0; letter-spacing: 1px; }
+    .ts-wave-num { font-size: calc(11px * var(--ui-scale, 1)); color: #9fb4d0; letter-spacing: 1px; }
     .ts-wave-bar {
-      width: 120px; height: 5px;
+      width: calc(120px * var(--ui-scale, 1)); height: calc(5px * var(--ui-scale, 1));
       background: #1a2238;
       border-radius: 3px;
       overflow: hidden;
@@ -516,7 +516,7 @@
       background: linear-gradient(90deg, #4a7ad0, #9fe3ff);
       transition: width 0.15s linear;
     }
-    .ts-timer { font-size: 13px; font-weight: 700; color: #9fe3ff; min-width: 46px; text-align: right; }
+    .ts-timer { font-size: calc(13px * var(--ui-scale, 1)); font-weight: 700; color: #9fe3ff; min-width: 46px; text-align: right; }
     .ts-timer.urgent { color: #ff5c6e; animation: pulse-warn 0.8s ease-in-out infinite; }
 
     /* 左下：灵力 + 符卡 */
@@ -537,9 +537,9 @@
     .bl-group { display: flex; align-items: center; gap: 8px; }
     .bl-label { font-size: 10px; color: #7d8aa8; letter-spacing: 2px; min-width: 26px; }
     .bl-pips { display: flex; gap: 4px; }
-    .bl-pips img { width: 22px; height: 22px; image-rendering: pixelated; }
+    .bl-pips img { width: calc(22px * var(--ui-scale, 1)); height: calc(22px * var(--ui-scale, 1)); image-rendering: pixelated; }
     .bl-spellbar { display: flex; gap: 4px; }
-    .bl-spellbar img { width: 30px; height: 30px; image-rendering: pixelated; }
+    .bl-spellbar img { width: calc(30px * var(--ui-scale, 1)); height: calc(30px * var(--ui-scale, 1)); image-rendering: pixelated; }
 
     /* ── 商店界面 ── */
     .shop-overlay {
@@ -1030,7 +1030,7 @@
     /* 手牌数 / 上限 */
     .hand-count {
       font-family: "Consolas", "Menlo", monospace;
-      font-size: 12px;
+      font-size: calc(12px * var(--ui-scale, 1));
       color: #8794b0;
       letter-spacing: 1px;
       margin-bottom: 2px;

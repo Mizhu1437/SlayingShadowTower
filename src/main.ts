@@ -12,7 +12,8 @@ import { World } from './core/world';
 import { FixedStep } from './core/loop';
 import { Input } from './render/input';
 import { GameRenderer } from './render/gameRenderer';
-import { FrameStage, FIELD_H as FH } from './render/frameStage';
+import { FrameStage } from './render/frameStage';
+import { computeLayout } from './ui/layout';
 import { HandUI } from './ui/handUI';
 import { ShopUI } from './ui/shopUI';
 import { DevConsole } from './ui/devConsole';
@@ -31,33 +32,17 @@ import { PassiveSlotsUI } from './ui/passiveSlotsUI';
  */
 
 /** 战场逻辑宽度 */
-const FIELD_LOGICAL_W = 384;
 
 /** 计算让战场刚好放进窗口的缩放倍数 */
-function computeViewport(): { vw: number; vh: number; scale: number } {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  // 战场下方要放手牌区（灵力 34 + 手牌 160 + 数量行 18 + 按钮 40 ≈ 260px）
-  const BOTTOM_ZONE = 264;
-  const TOP_ZONE = 56;          // 顶部幕次横幅
-  const availH = Math.max(240, vh - BOTTOM_ZONE - TOP_ZONE);
-
-  const byH = availH / FH;
-  const byW = (vw * 0.52) / FIELD_LOGICAL_W;
-  const scale = Math.min(byH, byW);
-
-  return { vw, vh, scale };
-}
 
 async function main() {
-  const vp = computeViewport();
+  const L = computeLayout();
 
   const app = new Application();
   await app.init({
     // 铺满整个窗口
-    width: vp.vw,
-    height: vp.vh,
+    width: L.vw,
+    height: L.vh,
     background: '#05060c',
     antialias: false,
     preference: 'webgl',
@@ -81,20 +66,10 @@ async function main() {
   const frame = new FrameStage();
   app.stage.addChild(frame.root);
   // 外框整体缩放，战场就在 frame.fieldHost 里
-  frame.root.scale.set(vp.scale);
+  frame.root.scale.set(L.scale);
 
-  // 战场**居中**，手牌在它正下方。
-  //
-  // 为什么改回居中：手牌跟着战场走、贴在战场正下方，
-  // 玩家的视线从弹幕下移一眼就能看到手牌，不用左右扫视。
-  // 代价是战场不能占满高度，要给下方手牌留出空间。
-  const fieldW = FIELD_LOGICAL_W * vp.scale;
-
-  // 战场放在顶部留白之下，下方整块留给手牌区
-  const topGap = 56;
-  const fieldLeft = Math.round((vp.vw - fieldW) / 2);
-  const fieldTop = Math.round(topGap);
-  frame.root.position.set(fieldLeft, fieldTop);
+  // 战场位置由 computeLayout 统一给出（按视口比例，不用固定像素）
+  frame.root.position.set(L.fieldX, L.fieldY);
 
   /**
    * 按战场矩形摆放 DOM 元素。
@@ -109,26 +84,33 @@ async function main() {
    * 全部用 fixed + 计算出的坐标，窗口缩放时重新算一次。
    */
   function syncLayout(): void {
-    const v = computeViewport();
-    const fTop = 56;
-    const fBottom = Math.round(fTop + FH * v.scale);
-    const fLeft = Math.round((v.vw - FIELD_LOGICAL_W * v.scale) / 2);
-    const fRight = Math.round(fLeft + FIELD_LOGICAL_W * v.scale);
+    const v = computeLayout();
+    const fBottom = v.fieldY + v.fieldH;
 
-    // 灵力/符卡：贴着战场底边下方
+    // 灵力/符卡：紧贴战场底边
     const bl = document.getElementById('bottom-left');
-    if (bl) bl.style.top = `${fBottom + 6}px`;
+    if (bl) {
+      bl.style.top = `${fBottom + Math.round(6 * v.uiScale)}px`;
+      bl.style.transformOrigin = 'top center';
+      bl.style.fontSize = `${12 * v.uiScale}px`;
+    }
 
     // 手牌区：灵力下方
     const hand = document.getElementById('hand-area');
-    if (hand) hand.style.top = `${fBottom + 42}px`;
+    if (hand) {
+      hand.style.top = `${fBottom + Math.round(46 * v.uiScale)}px`;
+      hand.style.width = `${v.handW}px`;
+    }
 
-    // 牌堆按钮：贴着战场左右两侧的下方
+    // 手牌卡片整体缩放，跟随 uiScale
+    document.documentElement.style.setProperty('--ui-scale', String(v.uiScale));
+
+    // 牌堆按钮：横向铺满战场宽度，贴窗口底
     const bar = document.getElementById('pile-bar');
     if (bar) {
-      bar.style.left = `${fLeft}px`;
-      bar.style.width = `${fRight - fLeft}px`;
-      bar.style.bottom = '14px';
+      bar.style.left = `${v.fieldX}px`;
+      bar.style.width = `${v.fieldW}px`;
+      bar.style.bottom = `${Math.round(14 * v.uiScale)}px`;
       bar.style.justifyContent = 'space-between';
     }
   }
@@ -139,10 +121,10 @@ async function main() {
   frame.fieldHost.addChild(renderer.root);
   // 四幕背景需要先从 public/art 加载纹理
   await renderer.initBackdrop();
-  // 两侧延伸铺满窗口剩余空间（不再固定 150px）
+  // 两侧延伸铺满窗口剩余空间
   const farTex = renderer.backdropFarTexture;
-  // 窗口宽度减去战场宽度，除以 2 再除以缩放 = 单侧逻辑宽度
-  const sideLogical = (vp.vw - FIELD_LOGICAL_W * vp.scale) / 2 / vp.scale;
+  // 视口剩余宽度 / 2，再除以缩放 = 单侧逻辑宽度
+  const sideLogical = (L.vw - L.fieldW) / 2 / L.scale;
   if (farTex) {
     frame.setEdgeSource(farTex, sideLogical);
     frame.buildFieldBorder();
