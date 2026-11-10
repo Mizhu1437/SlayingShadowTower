@@ -707,14 +707,14 @@
      * 不是整个画布半宽，结果面板压进了战场里。
      */
     #panel-left {
-      left: calc(50% - 462px - 168px - 10px);
+      left: 28px;
       align-items: flex-start;
     }
     /* 右侧面板整体上移，给右下角的手牌区让位 */
     #panel-right {
-      right: calc(50% - 462px - 168px - 10px);
+      right: 28px;
       align-items: flex-end;
-      top: 38%;
+      top: 20%;
     }
 
     .panel-block { display: flex; flex-direction: column; gap: 4px; }
@@ -890,8 +890,8 @@
     /* ── 左下角：被动符卡区 ── */
     #passive-slots {
       position: fixed;
-      left: calc(50% - 462px - 168px - 10px);
-      bottom: 46px;
+      left: 28px;
+      bottom: 52px;
       width: 168px;
       display: flex;
       flex-direction: column;

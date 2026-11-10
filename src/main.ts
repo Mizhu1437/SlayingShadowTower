@@ -12,7 +12,7 @@ import { World } from './core/world';
 import { FixedStep } from './core/loop';
 import { Input } from './render/input';
 import { GameRenderer } from './render/gameRenderer';
-import { FrameStage, FRAME_W, FIELD_H as FH } from './render/frameStage';
+import { FrameStage, FIELD_H as FH } from './render/frameStage';
 import { HandUI } from './ui/handUI';
 import { ShopUI } from './ui/shopUI';
 import { DevConsole } from './ui/devConsole';
@@ -21,24 +21,43 @@ import { DeckOverlay } from './ui/deckOverlay';
 import { PassiveSlotsUI } from './ui/passiveSlotsUI';
 
 /**
- * 画面缩放。
+ * 画面缩放（自适应全屏）。
  *
- * 从 1.6 降到 1.35：横版布局下画布宽 684 逻辑像素，
- * 1.6 倍是 1094，加上两侧各 168 的面板就是 1430，
- * 在 1400 宽窗口里会挤出屏幕。
- * 1.35 倍得到 923，加面板 1251，1600×900 常见分辨率下放得开。
+ * "对标标准全屏"：canvas 铺满整个窗口，
+ * 战场按比例缩放后居中，两侧由背景延伸填满。
+ *
+ * 这样无论窗口多大，信息面板都贴在**屏幕左右边缘**，
+ * 而不是像之前那样挤在战场两侧的一小块区域里。
  */
-const SCALE = 1.35;
+
+/** 战场逻辑宽度 */
+const FIELD_LOGICAL_W = 384;
+
+/** 计算让战场刚好放进窗口的缩放倍数 */
+function computeViewport(): { vw: number; vh: number; scale: number } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // 战场高度占窗口 84%，宽度不超过窗口 46%（留出两侧面板空间）
+  const byH = (vh * 0.84) / FH;
+  const byW = (vw * 0.46) / FIELD_LOGICAL_W;
+  const scale = Math.min(byH, byW);
+
+  return { vw, vh, scale };
+}
 
 async function main() {
+  const vp = computeViewport();
+
   const app = new Application();
   await app.init({
-    // 横版画面：战场 384 + 两侧各 150，共 684 逻辑宽
-    width: FRAME_W * SCALE,
-    height: FH * SCALE,
+    // 铺满整个窗口
+    width: vp.vw,
+    height: vp.vh,
     background: '#05060c',
     antialias: false,
     preference: 'webgl',
+    resizeTo: window,
   });
 
   const stageEl = document.getElementById('stage')!;
@@ -58,16 +77,27 @@ async function main() {
   const frame = new FrameStage();
   app.stage.addChild(frame.root);
   // 外框整体缩放，战场就在 frame.fieldHost 里
-  frame.root.scale.set(SCALE);
+  frame.root.scale.set(vp.scale);
+
+  // 战场居中：把 384 宽的战场摆在窗口水平正中
+  // （frame.root 的本地坐标系里，战场在 x=0..384）
+  const fieldW = FIELD_LOGICAL_W * vp.scale;
+  const fieldH = FH * vp.scale;
+  frame.root.position.set(
+    Math.round((vp.vw - fieldW) / 2),
+    Math.round((vp.vh - fieldH) / 2),
+  );
 
   const renderer = new GameRenderer(app, 1);
   frame.fieldHost.addChild(renderer.root);
   // 四幕背景需要先从 public/art 加载纹理
   await renderer.initBackdrop();
-  // 用背景近景的边缘生成两侧虚化延伸，让横版画面连成一片
+  // 两侧延伸铺满窗口剩余空间（不再固定 150px）
   const farTex = renderer.backdropFarTexture;
+  // 窗口宽度减去战场宽度，除以 2 再除以缩放 = 单侧逻辑宽度
+  const sideLogical = (vp.vw - FIELD_LOGICAL_W * vp.scale) / 2 / vp.scale;
   if (farTex) {
-    frame.setEdgeSource(farTex);
+    frame.setEdgeSource(farTex, sideLogical);
     frame.buildFieldBorder();
   }
   const loop = new FixedStep();
