@@ -94,6 +94,20 @@
     .stage-timer { color: #9fe3ff; }
     .stage-timer.urgent { color: #ff5c6e; font-weight: 700; }
 
+    /* 操作提示：收起时只有一个小问号，点击展开 */
+    #help.collapsed #help-body { display: none; }
+    #help-toggle {
+      pointer-events: auto;
+      cursor: pointer;
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #2a3350;
+      border-radius: 50%;
+      color: #7d8aa8;
+      font-size: 12px;
+    }
+    #help-toggle:hover { color: #9fe3ff; border-color: #4a6a9a; }
+
     #help {
       bottom: 14px;
       left: 14px;
@@ -184,15 +198,37 @@
     }
 
     /* ---------- 手牌区 ---------- */
+    /*
+     * 手牌区固定在右下角（按需求：右下角是手牌区）。
+     * 之前放在战场下方居中，那是错的 —— 会挤占战场，
+     * 而且不符合"两侧放面板"的整体布局。
+     */
+    /*
+     * 右下角垂直堆叠（自下而上）：
+     *   牌堆按钮  bottom:14px  高约 34
+     *   状态信息  bottom:52px
+     *   手牌卡片  bottom:70px
+     * 手牌区整体从 bottom:70 往上长，不会压到按钮。
+     */
     #hand-area {
-      width: 100%;
-      max-width: 640px;
+      position: fixed;
+      right: 16px;
+      bottom: 70px;
+      width: 420px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 5px;
-      flex-shrink: 0;
+      align-items: flex-end;
+      gap: 4px;
+      z-index: 25;
     }
+    #hand-area .hand,
+    #hand-area > div:not(.hand-info):not(.hand-count):not(.energy-wrap) {
+      display: flex;
+      justify-content: flex-end;
+      gap: 5px;
+    }
+    #hand-area .hand-count { align-self: flex-end; }
+    #hand-area .energy-wrap { align-self: flex-end; }
 
     .energy-wrap {
       display: flex;
@@ -246,18 +282,44 @@
     }
 
     .card {
-      width: 82px;
-      height: 76px;
+      width: 92px;
+      height: 152px;
       background: linear-gradient(160deg, #141a2b, #0e1320);
       border: 1px solid #2f3b5c;
       border-radius: 6px;
-      padding: 5px 6px;
+      padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 0;
       position: relative;
+      overflow: hidden;
       transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
       flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    /* 卡图：占卡片上半部，正方形等比裁切 */
+    .card-art {
+      position: relative;
+      width: 100%;
+      height: 100px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #0a0e18;
+    }
+    .card-art img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    /* 卡面下缘渐隐，让卡名读得出 */
+    .card-art::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 26px;
+      background: linear-gradient(transparent, #0e1320);
     }
     .card.selected {
       border-color: #6fd3ff;
@@ -266,6 +328,19 @@
     }
     .card.passive { border-color: #4a3a6b; }
 
+    .card-art .card-cost {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(8, 12, 22, 0.88);
+      border: 1px solid #4a6a9a;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 700;
+      color: #9fe3ff;
+      z-index: 2;
+    }
     .card-cost {
       position: absolute;
       top: -6px; left: -6px;
@@ -279,6 +354,22 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+    .card .card-name {
+      padding: 3px 5px 0;
+      font-size: 11px;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+    .card .card-text {
+      padding: 0 5px 4px;
+      font-size: 9px;
+      line-height: 1.35;
+      color: #8794b0;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .card-name {
       font-size: 10.5px;
@@ -296,11 +387,14 @@
       overflow: hidden;
     }
 
+    /* 状态信息（满能量/过载/牌堆数）压在手牌下方一行 */
     .hand-info {
       font-size: 10px;
       color: #55648a;
       height: 14px;
       letter-spacing: 0.3px;
+      text-align: right;
+      width: 100%;
     }
     .hand-info.overload { color: #ff8fa3; }
     /* ── 商店界面 ── */
@@ -507,7 +601,7 @@
     #pile-bar {
       position: fixed;
       right: 14px;
-      bottom: 14px;
+      bottom: 12px;
       display: flex;
       gap: 6px;
       z-index: 40;
@@ -615,9 +709,11 @@
       left: calc(50% - 462px - 168px - 10px);
       align-items: flex-start;
     }
+    /* 右侧面板整体上移，给右下角的手牌区让位 */
     #panel-right {
       right: calc(50% - 462px - 168px - 10px);
       align-items: flex-end;
+      top: 38%;
     }
 
     .panel-block { display: flex; flex-direction: column; gap: 4px; }
@@ -847,11 +943,15 @@
     <span id="fps">—</span>
   </div>
 
-  <div id="help" class="panel">
-    <div><kbd>方向键</kbd>/<kbd>WASD</kbd> 移动　<kbd>Shift</kbd> 低速</div>
-    <div><kbd>X</kbd> 释放符卡（中弹后有短暂决死窗口）</div>
-    <div><kbd>C</kbd> 切换选中的卡　<kbd>Z</kbd> 打出　<kbd>X</kbd> 释放符卡</div>
-    <div style="color:#ff8fa3;margin-top:4px">※ 本作没有自动射击 —— 所有输出只能靠卡牌</div>
+  <!-- 操作提示：默认收起，点 ? 展开 -->
+  <div id="help" class="panel collapsed">
+    <div id="help-toggle">?</div>
+    <div id="help-body">
+      <div><kbd>方向键</kbd>/<kbd>WASD</kbd> 移动　<kbd>Shift</kbd> 低速</div>
+      <div><kbd>Z</kbd> 打出卡牌　<kbd>C</kbd> 切换　<kbd>X</kbd> 符卡</div>
+      <div><kbd>E</kbd> 抽牌堆　<kbd>Q</kbd> 弃牌堆　<kbd>Tab</kbd> 卡组</div>
+    </div>
+  </div>
   </div>
 
   <div id="overlay" class="hidden">

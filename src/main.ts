@@ -72,6 +72,12 @@ async function main() {
   const loop = new FixedStep();
   const handUI = new HandUI(document.getElementById('hand-area')!);
 
+  // 操作提示折叠
+  const helpEl = document.getElementById('help');
+  document.getElementById('help-toggle')?.addEventListener('click', () => {
+    helpEl?.classList.toggle('collapsed');
+  });
+
   const shopUI = new ShopUI(document.body, {
     onBuy: (index) => {
       const r = world.buyShopItem(index);

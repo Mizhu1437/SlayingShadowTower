@@ -126,8 +126,18 @@ export class HandUI {
       if (c.type === 'passive') el.classList.add('passive');
 
       const cost = c.type === 'active' ? (c.energy ?? 0) : -1;
+
+      // 卡图：素材在 public/art/cards/{id}.png
+      // 起始卡有 hougeki_0..3 这类带序号的 id，取前缀映射到同一张图
+      const artId = c.id.replace(/_\d+$/, '');
+      const artSrc = `./art/cards/${artId}.png`;
+
       el.innerHTML = `
-        <div class="card-cost">${cost >= 0 ? cost : '被'}</div>
+        <div class="card-art">
+          <img src="${artSrc}" alt="" loading="lazy"
+               onerror="this.style.display='none'" />
+          <div class="card-cost">${cost >= 0 ? cost : '被'}</div>
+        </div>
         <div class="card-name">${escapeHtml(c.name)}</div>
         <div class="card-text">${escapeHtml(c.text ?? '')}</div>
       `;
