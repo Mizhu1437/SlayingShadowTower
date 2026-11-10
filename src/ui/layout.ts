@@ -23,16 +23,16 @@ export const FIELD_H = 448;
  * 不能写死比例（大屏时手牌也会跟着放大）。
  */
 const RATIO = {
-  top: 0.055,     // 幕次横幅留白
-  bar: 0.04,      // 底部按钮留白
+  top: 0.048,     // 幕次横幅留白
+  bar: 0.032,     // 底部按钮留白
 } as const;
 
 /** 底部区块的高度基准（px @ uiScale=1） */
 const BOTTOM_BASE = {
-  spirit: 34,     // 灵力 + 符卡
-  hand: 152,      // 手牌卡片
-  count: 18,      // 手牌数量行
-  gaps: 12,
+  spirit: 30,     // 灵力行
+  hand: 146,      // 手牌卡片
+  count: 16,      // 手牌数量行
+  gaps: 10,
 } as const;
 
 /**
@@ -86,7 +86,7 @@ export function computeLayout(): Layout {
    * 现在宽度上限放宽到 62%，让战场尽量吃满可用高度。
    */
   const byH = availH / FIELD_H;
-  const byW = (vw * 0.62) / FIELD_W;
+  const byW = (vw * 0.72) / FIELD_W;
   const scale = Math.max(0.55, Math.min(byH, byW));
 
   const fieldW = Math.round(FIELD_W * scale);

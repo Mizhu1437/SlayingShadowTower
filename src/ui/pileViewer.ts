@@ -28,7 +28,7 @@ export class PileViewer {
   private root: HTMLElement;
   private listEl: HTMLElement;
   private titleEl: HTMLElement;
-  private buttons: Record<Tab, HTMLButtonElement>;
+  private buttons: Record<'draw' | 'discard', HTMLButtonElement>;
 
   private open = false;
   private tab: Tab = 'draw';
@@ -68,34 +68,64 @@ export class PileViewer {
     const bar = document.createElement('div');
     bar.id = 'pile-bar';
     bar.innerHTML = `
-      <button class="pv-btn" data-tab="draw">
-        牌堆 <b id="pv-count-draw">0</b>
-      </button>
       <button class="pv-btn" data-tab="discard">
-        弃牌 <b id="pv-count-discard">0</b>
+        弃牌堆 <b id="pv-count-discard">0</b>
       </button>
-      <button class="pv-btn" data-tab="all">
-        卡组 <b id="pv-count-all">0</b>
+      <button class="pv-btn" data-tab="draw">
+        抽牌堆 <b id="pv-count-draw">0</b>
       </button>
     `;
     host.appendChild(bar);
 
-    const mk = (tab: Tab): HTMLButtonElement =>
+    const mk = (tab: 'draw' | 'discard'): HTMLButtonElement =>
       bar.querySelector(`[data-tab="${tab}"]`) as HTMLButtonElement;
 
     this.buttons = {
       draw: mk('draw'),
       discard: mk('discard'),
-      all: mk('all'),
     };
 
-    for (const tab of ['draw', 'discard', 'all'] as Tab[]) {
+    for (const tab of ['draw', 'discard'] as const) {
       this.buttons[tab].addEventListener('click', () => {
-        // 点同一个标签时收起，点别的则切换
-        if (this.open && this.tab === tab) this.hide();
-        else this.show(tab, this.pileRef ?? undefined);
+        // 弃牌堆向左展开，抽牌堆向右展开
+        this.setAnchor(tab === 'discard' ? 'left' : 'right');
+        if (this.open && this.tab === tab) {
+          this.hide();
+        } else {
+          this.show(tab, this.pileRef ?? undefined);
+          this.attachTo(this.buttons[tab]);
+        }
       });
     }
+  }
+
+  /**
+   * 设置面板相对按钮的展开方向。
+   *
+   * @param side 'left'  = 贴按钮左侧、向左展开（弃牌堆用）
+   *             'right' = 贴按钮右侧、向右展开（抽牌堆用）
+   */
+  setAnchor(side: 'left' | 'right'): void {
+    this.root.dataset.anchor = side;
+  }
+
+  /**
+   * 把面板贴到指定按钮旁边（按当前 anchor 决定贴哪一侧）。
+   */
+  attachTo(btn: HTMLElement | null): void {
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const anchor = this.root.dataset.anchor;
+
+    if (anchor === 'left') {
+      this.root.style.left = `${Math.round(r.left - 8)}px`;
+    } else {
+      this.root.style.left = `${Math.round(r.right + 8)}px`;
+    }
+    this.root.style.right = 'auto';
+    // 面板底边略高于按钮顶边，让它"从按钮上方长出来"
+    this.root.style.bottom = `${Math.round(window.innerHeight - r.top + 6)}px`;
+    this.root.style.top = 'auto';
   }
 
   /**
@@ -168,6 +198,10 @@ export class PileViewer {
 
     this.renderList();
     this.syncActiveButton();
+    const btn = this.tab === 'draw' || this.tab === 'discard'
+      ? this.buttons[this.tab]
+      : null;
+    this.attachTo(btn);
   }
 
   hide(): void {
@@ -182,7 +216,7 @@ export class PileViewer {
   }
 
   private syncActiveButton(): void {
-    for (const tab of ['draw', 'discard', 'all'] as Tab[]) {
+    for (const tab of ['draw', 'discard'] as const) {
       this.buttons[tab].classList.toggle('active', this.open && this.tab === tab);
     }
   }

@@ -109,13 +109,38 @@ async function main() {
     // 手牌卡片整体缩放，跟随 uiScale
     document.documentElement.style.setProperty('--ui-scale', String(v.uiScale));
 
-    // 牌堆按钮：横向铺满战场宽度，贴窗口底
+    /*
+     * 两个牌堆按钮：贴在战斗框**左右两侧的外面**，与手牌同一水平带。
+     *
+     * 为什么不放在战斗框宽度内：手牌区占了中间 600px，
+     * 按钮放在框内两侧仍会压到最左/最右的卡片。
+     * 移到框外，左手边放弃牌堆、右手边放抽牌堆，互不干扰。
+     */
     const bar = document.getElementById('pile-bar');
     if (bar) {
-      bar.style.left = `${v.fieldX}px`;
-      bar.style.width = `${v.fieldW}px`;
-      bar.style.bottom = `${Math.round(14 * v.uiScale)}px`;
+      const handTop = document.getElementById('hand-area')?.getBoundingClientRect().top;
+      const rowY = handTop
+        ? handTop
+        : fBottom + Math.round(46 * v.uiScale);
+      bar.style.left = '0';
+      bar.style.width = '100vw';
+      bar.style.top = `${Math.round(rowY + 40 * v.uiScale)}px`;
+      bar.style.bottom = 'auto';
       bar.style.justifyContent = 'space-between';
+      bar.style.paddingLeft = `${Math.round(24 * v.uiScale)}px`;
+      bar.style.paddingRight = `${Math.round(24 * v.uiScale)}px`;
+      bar.style.boxSizing = 'border-box';
+    }
+
+    // 卡组按钮：贴手牌数右侧
+    const deckBtn = document.getElementById('deck-btn');
+    if (deckBtn) {
+      const handEl = document.getElementById('hand-area');
+      const hr = handEl?.getBoundingClientRect();
+      if (hr) {
+        deckBtn.style.left = `${Math.round(hr.right + 10 * v.uiScale)}px`;
+        deckBtn.style.top = `${Math.round(hr.top + 2 * v.uiScale)}px`;
+      }
     }
 
     // 状态栏：贴在战场右缘外，垂直居中偏上
@@ -167,6 +192,19 @@ async function main() {
   const pileViewer = new PileViewer(document.body);
   const deckOverlay = new DeckOverlay(document.body);
   const passiveUI = new PassiveSlotsUI(document.body);
+
+  // 这些 UI 模块会把元素动态插进 body，必须等它们创建完再定位一次，
+  // 否则 syncLayout 找不到 #pile-bar 等节点（早期就是因此漏掉了按钮定位）。
+  syncLayout();
+
+  // 卡组按钮（在手牌数右侧）也能打开卡组总览
+  document.getElementById('deck-btn')?.addEventListener('click', () => {
+    deckOverlay.toggle(
+      world.deck.pile.allCards(),
+      world.deck.passiveSlots,
+      world.deck.passives.length,
+    );
+  });
 
   // 开发者控制台：按 ~ 打开
   let consoleOpen = false;
@@ -282,30 +320,10 @@ async function main() {
     }
   }
 
-  /**
-   * 符卡：用 spell_full/empty 素材排一行。
-   * 与右上角的"剩余符卡"不同 —— 这里是完整槽位显示，
-   * 让玩家看到上限与当前值的对比。
-   */
-  let lastSpellBarSig = '';
-  function renderSpellBar(cards: number, limit: number): void {
-    const sig = `${cards}/${limit}`;
-    if (sig === lastSpellBarSig) return;
-    lastSpellBarSig = sig;
-
-    hudSpellBar.innerHTML = '';
-    for (let i = 0; i < limit; i++) {
-      const img = document.createElement('img');
-      img.src = i < cards
-        ? './art/ui/spell_full.png'
-        : './art/ui/spell_empty.png';
-      img.alt = '';
-      hudSpellBar.appendChild(img);
-    }
-  }
-
   const hudWave = document.getElementById('wave')!;
   const hudWaveBar = document.getElementById('wave-bar')!;
+  const blStatus = document.getElementById('bl-status')!;
+  let lastBlStatus = '';
   /** 上一次播放警告音时的整秒数，避免同一秒重复响 */
   let lastWarnSecond = -1;
 
@@ -349,7 +367,6 @@ async function main() {
   const hudActName = document.getElementById('act-name')!;
   const hudActBanner = document.getElementById('act-banner-img') as HTMLImageElement;
   const hudEnergyPips = document.getElementById('energy-pips')!;
-  const hudSpellBar = document.getElementById('spell-bar')!;
 
   /** 四幕场景名（用于幕次横幅） */
   const ACT_SCENES = [
@@ -471,8 +488,14 @@ async function main() {
     if (input.consume('z')) world.playSelectedCard();
 
     // 牌堆查看：E 抽牌堆 / Q 弃牌堆 / Tab 卡组总览
-    if (input.consume('e')) pileViewer.toggle('draw', world.deck.pile);
-    if (input.consume('q')) pileViewer.toggle('discard', world.deck.pile);
+    if (input.consume('e')) {
+      pileViewer.setAnchor('right');
+      pileViewer.toggle('draw', world.deck.pile);
+    }
+    if (input.consume('q')) {
+      pileViewer.setAnchor('left');
+      pileViewer.toggle('discard', world.deck.pile);
+    }
     if (input.consume('tab')) {
       deckOverlay.toggle(
         world.deck.pile.allCards(),
@@ -498,6 +521,34 @@ async function main() {
     renderer.render(world);
     handUI.render(world.deck);
     pileViewer.syncCounts(world.deck.pile);
+    {
+      const all = document.getElementById('pv-count-all');
+      const total = world.deck.pile.totalCards;
+      if (all && all.textContent !== String(total)) all.textContent = String(total);
+    }
+
+    // 灵力右侧的状态提示（满能量 / 过载停顿 / 下一点能量）
+    {
+      const e = world.deck.energy;
+      let txt = '';
+      let warn = false;
+      if (world.deck.paused) {
+        txt = `过载 · 停顿 ${world.deck.pauseLeft.toFixed(1)}s`;
+        warn = true;
+      } else if (e.full) {
+        txt = '能量已满';
+      } else {
+        const remain = (1 - e.progress) * e.interval;
+        txt = `下一点 ${remain.toFixed(1)}s`;
+      }
+      if (txt !== lastBlStatus) {
+        lastBlStatus = txt;
+        blStatus.textContent = txt;
+        blStatus.classList.toggle('warn', warn);
+      } else {
+        blStatus.classList.toggle('warn', warn);
+      }
+    }
     passiveUI.render(world.deck.passives, world.deck.passiveSlots);
 
     // HUD
@@ -507,7 +558,6 @@ async function main() {
     renderLives(world.player.lives);
     renderSpellSlots(world.spell.cards);
     renderEnergy(world.deck.energy.value, world.deck.energy.cap);
-    renderSpellBar(world.spell.cards, world.spell.cardsLimit);
 
     const wv = world.waves;
     const actNames = ['一', '二', '三', '四'];

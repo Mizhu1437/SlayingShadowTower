@@ -760,13 +760,31 @@
      * 牌堆按钮：抽牌堆贴右下、弃牌堆贴左下、卡组在中间。
      * 位置由 main.ts 的 syncLayout 计算（跟随战斗区）。
      */
+    /*
+     * 两个按钮分别贴战斗框左右下角，而不是挤在中间 ——
+     * 中间是手牌区，挤在一起会重叠。
+     * 具体 left / right 由 main.ts 的 syncLayout 计算。
+     */
     #pile-bar {
       position: fixed;
       top: auto;
       bottom: 14px;
       display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
       gap: 8px;
       z-index: 40;
+      pointer-events: none;
+    }
+    #pile-bar .pv-btn { pointer-events: auto; }
+
+    /* 卡组按钮：手牌数右侧 */
+    #deck-btn {
+      position: fixed;
+      pointer-events: auto;
+      z-index: 40;
+      padding: 5px 12px;
+      font-size: calc(11px * var(--ui-scale, 1));
     }
     #pile-bar .pv-btn[data-tab="draw"] { order: 3; }
     #pile-bar .pv-btn[data-tab="discard"] { order: 1; }
@@ -1145,6 +1163,25 @@
       50% { opacity: 0.35; }
     }
 
+    /*
+     * 两个面板展开方向不同：
+     *   弃牌堆在左  → 面板贴按钮左侧，向左展开
+     *   抽牌堆在右  → 面板贴按钮右侧，向右展开
+     * 用 data-anchor 区分，位置由 JS 设置。
+     */
+    .pile-viewer[data-anchor="left"]  { transform: translateX(-100%); }
+    .pile-viewer[data-anchor="right"] { transform: none; }
+
+    /* 灵力右侧的状态提示 */
+    .bl-status {
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: calc(11px * var(--ui-scale, 1));
+      color: #8794b0;
+      letter-spacing: 0.5px;
+      min-width: calc(96px * var(--ui-scale, 1));
+    }
+    .bl-status.warn { color: #ff8fa3; }
+
   </style>
 </head>
 <body>
@@ -1196,16 +1233,17 @@
       <span class="bl-label">灵力</span>
       <div class="bl-pips" id="energy-pips"></div>
     </div>
-    <div class="bl-group">
-      <span class="bl-label">符卡</span>
-      <div class="bl-spellbar" id="spell-bar"></div>
-    </div>
+    <!-- 过载 / 能量提示：紧贴灵力右侧 -->
+    <div class="bl-status" id="bl-status"></div>
   </div>
 
   <!-- 战斗框内右上角：仅道中倒计时 10s 内或 BOSS 战显示 -->
   <div id="field-timer" class="hidden">10</div>
 
   <div id="hand-area"></div>
+
+  <!-- 卡组按钮：贴在手牌数右侧 -->
+  <button id="deck-btn" class="pv-btn">卡组 <b id="pv-count-all">0</b></button>
 
   <!-- 隐藏数据源：fps 只用来看性能，不显示 -->
   <div id="hud-data" style="display:none">
