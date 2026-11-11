@@ -1170,8 +1170,8 @@
      *   抽牌堆在右  → 面板贴按钮右侧，向右展开
      * 用 data-anchor 区分，位置由 JS 设置。
      */
-    .pile-viewer[data-anchor="left"]  { transform: translateX(-100%); }
-    .pile-viewer[data-anchor="right"] { transform: none; }
+    /* 位置全部由 attachTo() 用像素算出，这里不再用 transform，
+       否则会与定位叠加导致面板跑出屏幕。 */
 
     /* 灵力右侧的状态提示 */
     .bl-status {

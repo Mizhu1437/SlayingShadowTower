@@ -587,21 +587,19 @@ async function main() {
           : wv.isPausedMidway ? 'WAVE 整备' : 'WAVE —';
 
     /*
-     * 波次进度条：表示**整幕的推进程度**，不是当前这一波的时间进度。
+     * 波次进度条：**当前波次 / 总波次**，只用这两个整数算。
      *
-     * 早期用 (1 - 本波剩余/本波时长)，那有两个问题：
-     *   1. 每进一波进度条都会跳回 0，看起来"忽满忽空"
-     *   2. 本波若能提前杀光敌人，时间还没走完就换波，
-     *      进度条与玩家看到的 WAVE n/12 完全对不上
-     * 现在改为 (已过波数 + 本波完成度) / 总波数，与 WAVE 数字一致。
+     * 需求明确：它表示"打到第几波了"，不是本波倒计时。
+     * 所以不掺入任何时间成分 —— 早期版本混进了
+     * (1 - 本波剩余/本波时长)，导致每进一波进度条跳回 0，
+     * 且提前杀光敌人时与 WAVE 数字脱节。
+     *
+     * 现在：第 1 波时 1/12 ≈ 8.3%，第 12 波时 100%。
      */
     if (wv.phase === 'running') {
       const total = Math.max(1, wv.totalWaves);
-      const done = Math.max(0, wv.currentWave - 1);
-      const remain = wv.waveRemainSeconds;
-      const dur = wv.currentWaveDef?.duration ?? 30;
-      const inWave = dur > 0 ? Math.max(0, Math.min(1, 1 - remain / dur)) : 0;
-      const pct = ((done + inWave) / total) * 100;
+      const cur = Math.max(0, Math.min(wv.currentWave, total));
+      const pct = (cur / total) * 100;
       hudWaveBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
     } else {
       hudWaveBar.style.width = wv.phase === 'done' ? '100%' : '0%';

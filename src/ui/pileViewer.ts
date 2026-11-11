@@ -116,16 +116,34 @@ export class PileViewer {
     if (!btn) return;
     const r = btn.getBoundingClientRect();
     const anchor = this.root.dataset.anchor;
+    const panelW = this.root.offsetWidth || 300;
 
+    /*
+     * 直接算出面板的**左边界**，不依赖 CSS 的 translateX。
+     *
+     * 早期用 left=按钮左边 + translateX(-100%) 向左展开，
+     * 但那条 CSS transform 与 .pile-viewer 上的其他定位规则冲突，
+     * 面板实际跑到了屏幕外。这里改成纯数值定位：
+     *   弃牌堆（anchor=left）  → 面板右边缘贴按钮左边缘
+     *   抽牌堆（anchor=right） → 面板左边缘贴按钮右边缘
+     * 最后再夹一次到视口范围内，保证任何窗口尺寸都看得见。
+     */
+    let left: number;
     if (anchor === 'left') {
-      this.root.style.left = `${Math.round(r.left - 8)}px`;
+      left = r.left - 8 - panelW;
     } else {
-      this.root.style.left = `${Math.round(r.right + 8)}px`;
+      left = r.right + 8;
     }
+
+    const margin = 8;
+    left = Math.max(margin, Math.min(left, window.innerWidth - panelW - margin));
+    this.root.style.left = `${Math.round(left)}px`;
     this.root.style.right = 'auto';
-    // 面板底边略高于按钮顶边，让它"从按钮上方长出来"
+    // 面板底边贴在按钮顶边上方
     this.root.style.bottom = `${Math.round(window.innerHeight - r.top + 6)}px`;
     this.root.style.top = 'auto';
+    // 确保不被 transform 二次位移
+    this.root.style.transform = 'none';
   }
 
   /**
