@@ -13,7 +13,6 @@ import type { Deck } from '../core/cards/deck';
 export class HandUI {
   private readonly root: HTMLElement;
   private readonly cardEls: HTMLElement[] = [];
-  private readonly infoEl: HTMLElement;
   /** 手牌 N / 上限，贴在手牌区上方 */
   private readonly countEl: HTMLElement;
   private lastCountSig = '';
@@ -36,9 +35,6 @@ export class HandUI {
 
     host.appendChild(this.root);
 
-    this.infoEl = document.createElement('div');
-    this.infoEl.className = 'hand-info';
-    host.appendChild(this.infoEl);
   }
 
   /** 每帧调用；内部会判断是否需要重建 DOM */
@@ -64,36 +60,14 @@ export class HandUI {
       this.lastSelected = deck.selected;
     }
 
-    // 能量不在这里显示（左下角有灵力图标排），
-    // 但下面的状态提示仍需要进度来算倒计时
-    const e = deck.energy;
-
-    // 状态提示
-    //
-    // 时间必须显示"还剩多少"，而不是"已经过了多少"：
-    //   progress 是已积累的比例（0→1），剩余时间 = (1 - progress) × 间隔。
-    //   早先写成 progress × 常数，既是从 0 往上涨（像正计时），
-    //   又把间隔硬编码成 3 秒，导致 T 改成 5 后显示仍是 3。
-    let info = '';
-    if (deck.paused) {
-      info = `过载 · 抽牌停顿 ${deck.pauseLeft.toFixed(1)}s`;
-    } else if (e.full) {
-      info = '能量已满';
-    } else {
-      const remain = (1 - e.progress) * e.interval;
-      info = `下一点能量 ${remain.toFixed(1)}s`;
-    }
-    const deckInfo =
-      `牌堆 ${deck.pile.drawCount} · 弃牌 ${deck.pile.discardCount}`;
-    this.infoEl.textContent = `${info}　｜　${deckInfo}`;
-
     // 手牌数 / 上限
     const cnt = `${deck.pile.handSize} / ${deck.pile.cfg.upper}`;
     if (cnt !== this.lastCountSig) {
       this.lastCountSig = cnt;
       this.countEl.textContent = `手牌 ${cnt}`;
     }
-    this.infoEl.classList.toggle('overload', deck.paused);
+    // 能量与牌堆信息现在分别由「灵力」行与两个牌堆按钮承担，
+    // 手牌区下方那行旧提示已删除，避免与它们重复。
   }
 
   private rebuild(hand: { id: string; name: string; type: string; energy?: number; text?: string }[]): void {

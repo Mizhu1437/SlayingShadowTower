@@ -143,6 +143,16 @@ async function main() {
       }
     }
 
+    // 被动符卡区：贴左下，底边在弃牌堆按钮上方
+    const ps = document.getElementById('passive-slots');
+    if (ps) {
+      const barEl = document.getElementById('pile-bar');
+      const barTop = barEl?.getBoundingClientRect().top;
+      const btnH = 34 * v.uiScale;
+      const topY = barTop ? barTop - btnH - 12 * v.uiScale : v.vh - 120;
+      ps.style.top = `${Math.round(topY - 100 * v.uiScale)}px`;
+    }
+
     // 状态栏：贴在战场右缘外，垂直居中偏上
     const status = document.getElementById('top-status');
     if (status) {
@@ -576,13 +586,25 @@ async function main() {
         : wv.phase === 'done' ? 'WAVE 完成'
           : wv.isPausedMidway ? 'WAVE 整备' : 'WAVE —';
 
-    // 波次进度条（右侧状态栏里的细条，始终显示）
+    /*
+     * 波次进度条：表示**整幕的推进程度**，不是当前这一波的时间进度。
+     *
+     * 早期用 (1 - 本波剩余/本波时长)，那有两个问题：
+     *   1. 每进一波进度条都会跳回 0，看起来"忽满忽空"
+     *   2. 本波若能提前杀光敌人，时间还没走完就换波，
+     *      进度条与玩家看到的 WAVE n/12 完全对不上
+     * 现在改为 (已过波数 + 本波完成度) / 总波数，与 WAVE 数字一致。
+     */
     if (wv.phase === 'running') {
+      const total = Math.max(1, wv.totalWaves);
+      const done = Math.max(0, wv.currentWave - 1);
       const remain = wv.waveRemainSeconds;
-      const total = wv.currentWaveDef?.duration ?? 30;
-      hudWaveBar.style.width = `${Math.max(0, Math.min(100, (1 - remain / total) * 100))}%`;
+      const dur = wv.currentWaveDef?.duration ?? 30;
+      const inWave = dur > 0 ? Math.max(0, Math.min(1, 1 - remain / dur)) : 0;
+      const pct = ((done + inWave) / total) * 100;
+      hudWaveBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
     } else {
-      hudWaveBar.style.width = '0%';
+      hudWaveBar.style.width = wv.phase === 'done' ? '100%' : '0%';
     }
 
     /*

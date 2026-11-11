@@ -1070,10 +1070,11 @@
     .hand-count::first-letter { color: #6f7d9c; }
 
     /* ── 左下角：被动符卡区 ── */
+    /* 位置由 syncLayout 计算：贴在弃牌堆按钮上方 */
     #passive-slots {
       position: fixed;
       left: 28px;
-      bottom: 52px;
+      bottom: auto;
       width: 168px;
       display: flex;
       flex-direction: column;
