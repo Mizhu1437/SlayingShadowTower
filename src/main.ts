@@ -20,7 +20,7 @@ import { DevConsole } from './ui/devConsole';
 import { PileViewer } from './ui/pileViewer';
 import { DeckOverlay } from './ui/deckOverlay';
 import { PassiveSlotsUI } from './ui/passiveSlotsUI';
-import { DifficultySelect } from './ui/difficultySelect';
+import { MenuUI } from './ui/menuUI';
 
 /**
  * 画面缩放（自适应全屏）。
@@ -205,16 +205,48 @@ async function main() {
   const passiveUI = new PassiveSlotsUI(document.body);
 
   /*
-   * 难度选择：开局先弹出，选完才允许推进逻辑。
-   * 为什么放在这里而不是设置里 —— 难度决定弹幕密度、掉落与价格，
-   * 中途切换等于换了个游戏，必须在开局定下来。
+   * 游戏循环：主菜单 → 对局 → 结算 → 回主菜单。
+   *
+   * 难度在开局时定下并贯穿整局 —— 它决定弹幕密度、掉落与价格，
+   * 中途切换等于换了个游戏。
    */
   let gameStarted = false;
-  new DifficultySelect(document.body, (id) => {
+
+  /** 开始一局：设难度、重置世界、进入 playing */
+  function startRun(id: Parameters<typeof world.setDifficulty>[0]): void {
     world.setDifficulty(id);
     world.reset();
+    world.flow.startGame();
+
+    // 关卡生成放在这里而不是启动时 ——
+    // 主菜单阶段不该在后台生成关卡，否则玩家看到的难度
+    // 与实际关卡（可能已按旧难度生成）会对不上。
+    if (!world.startAct(0)) {
+      console.error('关卡生成失败：', world.lastStageError);
+    }
+
     gameStarted = true;
-  });
+    menuUI.hideResult();
+    menuUI.hideMenu();
+  }
+
+  /** 结束一局：生成结算数据并展示 */
+  function endRun(outcome: 'cleared' | 'gaveup'): void {
+    gameStarted = false;
+    world.flow.onCleared();
+    menuUI.showResult(world.buildRunStats(outcome));
+  }
+
+  const menuUI = new MenuUI(
+    document.body,
+    (id) => startRun(id),      // 主菜单「开始游戏」
+    (id) => startRun(id),      // 结算「再来一局」
+  );
+
+  // 启动时进入主菜单。World 默认是 playing（纯逻辑层的默认值），
+  // 这里显式切到 menu，避免开局就在后台跑逻辑。
+  world.flow.toMenu();
+  menuUI.showMenu();
 
   // 这些 UI 模块会把元素动态插进 body，必须等它们创建完再定位一次，
   // 否则 syncLayout 找不到 #pile-bar 等节点（早期就是因此漏掉了按钮定位）。
@@ -260,11 +292,6 @@ async function main() {
     if (!advanced && world.phase === 'cleared') {
       syncOverlay();
     }
-  }
-
-  // 启动第一幕
-  if (!world.startAct(0)) {
-    console.error('关卡生成失败：', world.lastStageError);
   }
 
   // ---------- HUD ----------
@@ -408,32 +435,27 @@ async function main() {
 
   let overlayShown = false;
 
+  /**
+   * 死亡面板：只负责"续关 / 放弃"。
+   *
+   * 结束对局的成绩展示改由 MenuUI 的结算界面承担 ——
+   * 那个界面有评分等级、分项明细、再来一局/回主菜单，
+   * 比这里塞两行文字完整得多。
+   */
   function syncOverlay(): void {
-    const phase = world.phase;
-    const shouldShow = phase === 'dead' || phase === 'cleared';
+    const shouldShow = world.phase === 'dead';
 
     if (shouldShow && !overlayShown) {
       overlayShown = true;
       overlay.classList.remove('hidden');
-      if (phase === 'cleared') {
-        overlayTitle.textContent = '结束';
-        overlayStats.innerHTML =
-          `得分 <b>${world.score}</b>　击破 <b>${world.kills}</b>` +
-          `　蜃銭 <b>${world.coins}</b>`;
-        btnContinue.textContent = '重新开始';
-        btnContinue.dataset.action = 'restart';
-        btnGiveUp.textContent = '关闭';
-        btnGiveUp.dataset.action = 'close';
-      } else {
-        overlayTitle.textContent = '残机耗尽';
-        overlayStats.innerHTML =
-          `得分 <b>${world.score}</b>　击破 <b>${world.kills}</b>` +
-          `<br>是否续关？`;
-        btnContinue.textContent = '续关';
-        btnContinue.dataset.action = 'continue';
-        btnGiveUp.textContent = '放弃';
-        btnGiveUp.dataset.action = 'giveup';
-      }
+      overlayTitle.textContent = '残机耗尽';
+      overlayStats.innerHTML =
+        `得分 <b>${world.score}</b>　击破 <b>${world.kills}</b>` +
+        `<br>是否续关？`;
+      btnContinue.textContent = '续关';
+      btnContinue.dataset.action = 'continue';
+      btnGiveUp.textContent = '放弃';
+      btnGiveUp.dataset.action = 'giveup';
     } else if (!shouldShow && overlayShown) {
       overlayShown = false;
       overlay.classList.add('hidden');
@@ -453,8 +475,12 @@ async function main() {
   });
 
   btnGiveUp.addEventListener('click', () => {
-    if (btnGiveUp.dataset.action === 'giveup') world.giveUp();
-    else restart();
+    if (btnGiveUp.dataset.action === 'giveup') {
+      world.giveUp();          // dead → cleared
+      overlayShown = false;
+      overlay.classList.add('hidden');
+      endRun('gaveup');        // 弹出结算界面
+    }
     syncOverlay();
   });
 
@@ -468,11 +494,6 @@ async function main() {
     } else if (world.phase === 'dead') {
       if (e.key === 'Enter') { btnContinue.click(); e.preventDefault(); }
       else if (e.key === 'Escape') { btnGiveUp.click(); e.preventDefault(); }
-    } else if (world.phase === 'cleared') {
-      if (e.key === 'Enter' || e.key === 'Escape') {
-        btnContinue.click();
-        e.preventDefault();
-      }
     }
   });
 
@@ -655,6 +676,15 @@ async function main() {
     // 一幕打完后自动进入商店（只触发一次：enterShop 内部会拒绝重复进入）
     if (world.phase === 'playing' && world.actCleared) {
       world.enterShop();
+    }
+
+    /*
+     * 通关检测：World 在最后一幕打完后会把 phase 置为 cleared。
+     * 这里负责弹出结算界面 —— 逻辑层不碰 UI，
+     * 由外层观察状态变化来驱动，避免 core 依赖 DOM。
+     */
+    if (world.phase === 'cleared' && gameStarted) {
+      endRun('cleared');
     }
 
     if (shopHintTimer > 0) {

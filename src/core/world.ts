@@ -14,6 +14,7 @@ import { BURN_CONFIG } from './status';
 import { Shop } from './shop/shop';
 import { Enemy, type EnemyConfig } from './enemy';
 import type { EmitterSpec } from './danmaku/emitter';
+import type { RunStats } from './runStats';
 import {
   DEFAULT_DIFFICULTY,
   getDifficulty,
@@ -528,6 +529,36 @@ export class World {
 
   /** 总幕数 */
   static readonly TOTAL_ACTS = 4;
+
+  /** 本局已用时长（秒），供结算面板显示 */
+  get elapsedSeconds(): number {
+    return this.elapsed;
+  }
+
+  /**
+   * 生成本局结算数据快照。
+   *
+   * @param outcome 结局：真打通还是放弃
+   */
+  buildRunStats(outcome: 'cleared' | 'gaveup'): RunStats {
+    return {
+      outcome,
+      difficulty: this.difficulty,
+      score: this.score,
+      kills: this.kills,
+      coins: this.coins,
+      // currentAct 从 0 起，展示用 1 起；打完最后一幕时 actsCleared 已是总数
+      actReached: Math.min(
+        World.TOTAL_ACTS,
+        Math.max(this.currentAct + 1, this.actsCleared),
+      ),
+      totalActs: World.TOTAL_ACTS,
+      elapsedSeconds: this.elapsed,
+      continues: this.flow.continueCount,
+      deckSize: this.deck.pile.allCards().length,
+      passiveCount: this.deck.passives.length,
+    };
+  }
 
   /**
    * 本幕打完后进入商店。
