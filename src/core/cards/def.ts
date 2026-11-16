@@ -54,7 +54,7 @@ export type EffectOp =
   | { op: 'bullet_slow'; seconds: number; factor: number }
   /** 对场上敌人附加状态（虚弱 / 燃烧） */
   | { op: 'apply_status'; status: 'weak' | 'burn'; seconds: number }
-  | { op: 'if_low_life'; threshold: number; then: EffectOp[] };
+  | { op: 'if_low_life'; threshold: number; then: EffectOp[]; else?: EffectOp[] };
 
 /** 卡牌定义 */
 export interface CardDef {

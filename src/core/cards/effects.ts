@@ -141,6 +141,9 @@ export function executeEffects(
         if (ctx.currentLives <= e.threshold) {
           log.push({ op: 'if_low_life', detail: `条件成立（残机 ${ctx.currentLives} ≤ ${e.threshold}）` });
           executeEffects(e.then, ctx, log);
+        } else if (e.else) {
+          log.push({ op: 'if_low_life', detail: `条件不成立（残机 ${ctx.currentLives} > ${e.threshold}）` });
+          executeEffects(e.else, ctx, log);
         } else {
           log.push({ op: 'if_low_life', detail: `条件不成立（残机 ${ctx.currentLives} > ${e.threshold}）` });
         }
