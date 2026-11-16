@@ -1183,6 +1183,83 @@
     }
     .bl-status.warn { color: #ff8fa3; }
 
+    /* ── 难度选择 ── */
+    #difficulty-select {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 5, 10, 0.94);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+    #difficulty-select.hidden { display: none; }
+
+    .ds-panel {
+      width: min(520px, 90vw);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 28px 30px;
+      background: #0a0d18;
+      border: 1px solid #2a3350;
+      border-radius: 10px;
+      box-shadow: 0 24px 90px rgba(0, 0, 0, 0.9);
+    }
+    .ds-title {
+      font-family: "Songti SC", "SimSun", serif;
+      font-size: 20px;
+      letter-spacing: 3px;
+      color: #ffe0c0;
+      text-align: center;
+    }
+    .ds-sub {
+      font-size: 12px;
+      color: #7d8aa8;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    .ds-list { display: flex; flex-direction: column; gap: 8px; }
+    .ds-item {
+      padding: 11px 14px;
+      background: #12172a;
+      border: 1px solid #26304d;
+      border-left: 3px solid #3a4a75;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .ds-item:hover { border-left-color: #6b8cff; background: #161d33; }
+    .ds-item.on {
+      border-color: #6fd3ff;
+      border-left-color: #6fd3ff;
+      background: #16233d;
+      box-shadow: 0 0 14px rgba(111, 211, 255, 0.22);
+    }
+    .ds-name { font-size: 14px; color: #e8eeff; font-weight: 600; }
+    .ds-desc { font-size: 11px; color: #8794b0; margin-top: 3px; }
+
+    .ds-hint {
+      font-size: 10px;
+      color: #55607a;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .ds-start {
+      padding: 11px;
+      background: linear-gradient(180deg, #2d5bb8, #1e3f85);
+      border: 1px solid #4a7ad0;
+      border-radius: 6px;
+      color: #eaf4ff;
+      font-size: 14px;
+      letter-spacing: 4px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .ds-start:hover { background: linear-gradient(180deg, #3768c8, #264a96); }
+
   </style>
 </head>
 <body>

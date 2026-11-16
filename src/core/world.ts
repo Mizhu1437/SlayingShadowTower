@@ -13,6 +13,13 @@ import { CardShots } from './shot/cardShots';
 import { BURN_CONFIG } from './status';
 import { Shop } from './shop/shop';
 import { Enemy, type EnemyConfig } from './enemy';
+import type { EmitterSpec } from './danmaku/emitter';
+import {
+  DEFAULT_DIFFICULTY,
+  getDifficulty,
+  type DifficultyDef,
+  type DifficultyId,
+} from './difficulty';
 import { BulletField } from './danmaku/bulletField';
 import { SpatialGrid } from './danmaku/spatialGrid';
 import { Rng, derive } from './rng';
@@ -631,8 +638,18 @@ export class World {
   /** 是否正在等待玩家选择要删除的卡 */
   pendingRemoveCard = false;
 
-  /** 难度导致的价格倍率（P4 接入难度表，现在固定 1） */
-  shopPriceMul = 1;
+  /** 难度定义（决定弹幕密度、掉落与价格三条轴） */
+  difficulty: DifficultyDef = getDifficulty(DEFAULT_DIFFICULTY);
+
+  /** 难度导致的价格倍率（供商店读取） */
+  get shopPriceMul(): number {
+    return this.difficulty.priceMul;
+  }
+
+  /** 设置难度。只影响之后生成的敌人与之后的掉落，不改已存在的东西 */
+  setDifficulty(id: DifficultyId | string): void {
+    this.difficulty = getDifficulty(String(id));
+  }
 
   /** 本次商店是否是第四幕的中途商店（道中BOSS 后） */
   shopAfterMidway = false;
@@ -801,7 +818,7 @@ export class World {
     // 1. 生成排队中的敌人
     if (this.pendingSpawns.length) {
       for (const s of this.pendingSpawns) {
-        this.enemies.push(new Enemy(s.cfg, s.x, s.y, s.targetY));
+        this.enemies.push(new Enemy(this.applyDifficulty(s.cfg), s.x, s.y, s.targetY));
       }
       this.pendingSpawns.length = 0;
     }
@@ -1008,8 +1025,56 @@ export class World {
     this.kills++;
     // 蜃銭不再是直接加进数字，而是在敌人位置爆出来让玩家去捡
     if (e.coin > 0) {
-      this.spawnCoinDrop(e.x, e.y, e.coin);
+      // 掉落受难度影响：高难度钱更少，每次购买都要取舍
+      this.spawnCoinDrop(e.x, e.y, Math.max(1, Math.round(e.coin * this.difficulty.coinDropMul)));
     }
+  }
+
+  /**
+   * 按当前难度调整敌人配置，返回新的配置对象（不改原模板）。
+   *
+   * 只调三条轴里的「弹幕密度」：
+   *   开火间隔 × mul（>1 更慢）
+   *   每次弹数 × mul
+   *   弹速     × mul
+   *
+   * 血量、体型、得分、掉落都不动 —— 血量变化会让"打了多久"
+   * 随难度漂移，反而模糊了难度到底难在哪。
+   *
+   * 注意：必须深拷贝 emitter（含 nested），否则会改到
+   * ENEMY_POOL 里的共享模板，导致难度被反复叠加。
+   */
+  private applyDifficulty(cfg: EnemyConfig): EnemyConfig {
+    const d = this.difficulty;
+    const scaleEmitter = (e: EmitterSpec): EmitterSpec => ({
+      ...e,
+      count: Math.max(1, Math.round(e.count * d.bulletCountMul)),
+      speed: e.speed * d.bulletSpeedMul,
+      nested: e.nested
+        ? {
+            ...e.nested,
+            repeat: Math.max(1, Math.round(e.nested.repeat * d.bulletCountMul)),
+          }
+        : undefined,
+    });
+
+    const out: EnemyConfig = {
+      ...cfg,
+      fireInterval: cfg.fireInterval !== undefined
+        ? cfg.fireInterval * d.fireIntervalMul
+        : undefined,
+      emitter: cfg.emitter ? scaleEmitter(cfg.emitter) : undefined,
+    };
+
+    if (cfg.phases) {
+      out.phases = cfg.phases.map((p) => ({
+        ...p,
+        fireInterval: p.fireInterval * d.fireIntervalMul,
+        emitter: scaleEmitter(p.emitter),
+      }));
+    }
+
+    return out;
   }
 
   /**

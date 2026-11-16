@@ -20,6 +20,7 @@ import { DevConsole } from './ui/devConsole';
 import { PileViewer } from './ui/pileViewer';
 import { DeckOverlay } from './ui/deckOverlay';
 import { PassiveSlotsUI } from './ui/passiveSlotsUI';
+import { DifficultySelect } from './ui/difficultySelect';
 
 /**
  * 画面缩放（自适应全屏）。
@@ -202,6 +203,18 @@ async function main() {
   const pileViewer = new PileViewer(document.body);
   const deckOverlay = new DeckOverlay(document.body);
   const passiveUI = new PassiveSlotsUI(document.body);
+
+  /*
+   * 难度选择：开局先弹出，选完才允许推进逻辑。
+   * 为什么放在这里而不是设置里 —— 难度决定弹幕密度、掉落与价格，
+   * 中途切换等于换了个游戏，必须在开局定下来。
+   */
+  let gameStarted = false;
+  new DifficultySelect(document.body, (id) => {
+    world.setDifficulty(id);
+    world.reset();
+    gameStarted = true;
+  });
 
   // 这些 UI 模块会把元素动态插进 body，必须等它们创建完再定位一次，
   // 否则 syncLayout 找不到 #pile-bar 等节点（早期就是因此漏掉了按钮定位）。
@@ -518,7 +531,7 @@ async function main() {
 
     // 固定步推进。卡组总览打开时暂停 —— 那是玩家做长期规划的时刻，
     // 需要完整注意力，不能边躲弹边看牌组。
-    if (!deckOverlay.isOpen) {
+    if (!deckOverlay.isOpen && gameStarted) {
       loop.advance(realDt, () => {
         world.step();
       });
