@@ -91,22 +91,68 @@ export const ENEMY_POOL: EnemyPool = {
     fireInterval: 1.6,
   },
 
-  // ── 关底 BOSS（占位）──
+  // ── 关底 BOSS：三阶段 ──
+  //
+  // 设计意图：1800 血只打一种弹幕会变成"血条在掉但没有新东西"。
+  // 按 66% / 33% 切成三段，弹幕从"可读的环形"逐步升级到
+  // "密集螺旋"，让战斗有明显的推进感。
+  //
+  // 每段切换后停火 0.9–1.2 秒：血量刚破线就被新弹幕糊脸会很突兀，
+  // 这个窗口让玩家重新定位。
+  //
+  // 难度曲线：第 1 段让玩家熟悉节奏，第 2 段加入旋转压迫，
+  // 第 3 段用高频螺旋 + 加速嵌套制造真正的高潮。
   boss_placeholder: {
     hp: 1800,
     radius: 38,
     score: 10000,
     coin: 300,
-    emitter: {
-      count: 20,
-      angle: 0,
-      spread: Math.PI * 2,
-      speed: 130,
-      radius: 6,
-      life: 7,
-      nested: { interval: 0.5, repeat: 30, stepDeg: 9, speedStep: 2 },
-    },
-    fireInterval: 2.2,
+    phases: [
+      // 第一阶段（100%–66%）：宽环形，节奏慢，留出躲位空间
+      {
+        hpAbove: 0.66,
+        fireInterval: 2.0,
+        emitter: {
+          count: 16,
+          angle: 0,
+          spread: Math.PI * 2,
+          speed: 115,
+          radius: 6,
+          life: 7,
+          nested: { interval: 0.55, repeat: 18, stepDeg: 11 },
+        },
+      },
+      // 第二阶段（66%–33%）：双层旋转环，速度提升
+      {
+        hpAbove: 0.33,
+        fireInterval: 1.5,
+        pauseSeconds: 0.9,
+        emitter: {
+          count: 20,
+          angle: 0,
+          spread: Math.PI * 2,
+          speed: 135,
+          radius: 6,
+          life: 7,
+          nested: { interval: 0.42, repeat: 26, stepDeg: 13, speedStep: 1.5 },
+        },
+      },
+      // 第三阶段（33%–0）：密集螺旋 + 加速，收尾高潮
+      {
+        hpAbove: 0,
+        fireInterval: 1.0,
+        pauseSeconds: 1.2,
+        emitter: {
+          count: 24,
+          angle: 0,
+          spread: Math.PI * 2,
+          speed: 120,
+          radius: 5,
+          life: 6,
+          nested: { interval: 0.3, repeat: 36, stepDeg: 7, speedStep: 2.5 },
+        },
+      },
+    ],
   },
 };
 
