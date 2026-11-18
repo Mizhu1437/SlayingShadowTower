@@ -51,6 +51,16 @@ SPEC["ui/spell_empty.png"] = (46, 46, True)
 for _act in range(1, 5):
     SPEC[f"ui/act_banner_{_act}.png"] = (420, 96, True)
 
+# 战斗像素绘（自机 + 7 种敌人）
+SPEC["pixel/pixel_player.png"] = (48, 48, True)
+SPEC["pixel/pixel_grunt.png"] = (32, 32, True)
+SPEC["pixel/pixel_fan.png"] = (40, 40, True)
+SPEC["pixel/pixel_ring.png"] = (48, 48, True)
+SPEC["pixel/pixel_elite_spiral.png"] = (56, 56, True)
+SPEC["pixel/pixel_elite_burst.png"] = (60, 60, True)
+SPEC["pixel/pixel_midboss.png"] = (80, 80, True)
+SPEC["pixel/pixel_boss.png"] = (96, 96, True)
+
 # 标题背景
 SPEC["ui/title_bg.png"] = (1920, 1080, False)
 
@@ -113,6 +123,29 @@ def check_center_subject(im: Image.Image) -> tuple[bool, str]:
     return ok, f"边缘方差 {edge:.0f} / 中部方差 {mid:.0f}"
 
 
+def check_pixel_art(im: Image.Image) -> tuple[bool, str]:
+    """
+    像素画专项：检查颜色数是否够少、边缘是否够硬。
+
+    判断「是不是真像素画」的两个可量化特征：
+      1. 颜色数少（<=24 含透明）—— 插画缩放过来的图会有成百上千种颜色
+      2. 相邻像素存在大量完全相同或完全不同的跳变（硬边），
+         而抗锯齿图会有大量中间过渡色
+
+    这里只做颜色数检查 —— 它最稳定，能可靠区分"真像素画"与"插画缩小图"。
+    """
+    rgba = im.convert("RGBA")
+    colors = rgba.getcolors(maxcolors=100000)
+    if colors is None:
+        return False, "颜色数超过 10 万，明显不是像素画"
+
+    n = len(colors)
+    if n > 64:
+        return False, f"颜色数 {n}，像素画应 ≤64（含透明与半透明）"
+
+    return True, f"颜色数 {n}"
+
+
 def check_alpha(im: Image.Image) -> tuple[bool, str]:
     """必须有真透明区域（不是整张不透明）。"""
     if im.mode != "RGBA":
@@ -157,6 +190,11 @@ def main() -> int:
             good, msg = check_alpha(im)
             if not good:
                 problems.append(f"透明通道：{msg}")
+
+        if rel.startswith("pixel/"):
+            good, msg = check_pixel_art(im)
+            if not good:
+                problems.append(f"像素画：{msg}")
 
         if rel in SEAMLESS:
             good, msg = check_seamless(im)
