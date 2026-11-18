@@ -20,7 +20,7 @@ import { DevConsole } from './ui/devConsole';
 import { PileViewer } from './ui/pileViewer';
 import { DeckOverlay } from './ui/deckOverlay';
 import { PassiveSlotsUI } from './ui/passiveSlotsUI';
-import { MenuUI } from './ui/menuUI';
+import { MenuUI, type MenuPick } from './ui/menuUI';
 
 /**
  * 画面缩放（自适应全屏）。
@@ -212,22 +212,27 @@ async function main() {
    */
   let gameStarted = false;
 
-  /** 开始一局：设难度、重置世界、进入 playing */
-  function startRun(id: Parameters<typeof world.setDifficulty>[0]): void {
-    world.setDifficulty(id);
+  /**
+   * 开始一局：应用「难度 + 机体」的选择，重置世界，进入 playing。
+   *
+   * 顺序很重要：先换机体再重置 ——
+   * setCharacter 会重建自机与初始卡组，必须发生在 reset 之前，
+   * 否则 reset 会把刚建好的机体覆盖掉。
+   */
+  function startRun(pick: MenuPick): void {
+    world.setDifficulty(pick.difficulty);
+    world.setCharacter(pick.characterId);
     world.reset();
     world.flow.startGame();
 
     // 关卡生成放在这里而不是启动时 ——
-    // 主菜单阶段不该在后台生成关卡，否则玩家看到的难度
+    // 菜单阶段不该在后台生成关卡，否则玩家看到的难度
     // 与实际关卡（可能已按旧难度生成）会对不上。
     if (!world.startAct(0)) {
       console.error('关卡生成失败：', world.lastStageError);
     }
 
     gameStarted = true;
-    menuUI.hideResult();
-    menuUI.hideMenu();
   }
 
   /** 结束一局：生成结算数据并展示 */
@@ -237,16 +242,13 @@ async function main() {
     menuUI.showResult(world.buildRunStats(outcome));
   }
 
-  const menuUI = new MenuUI(
-    document.body,
-    (id) => startRun(id),      // 主菜单「开始游戏」
-    (id) => startRun(id),      // 结算「再来一局」
-  );
+  // 标题 → 难度 → 机体 → 对局，三步分屏由 MenuUI 内部管理
+  const menuUI = new MenuUI(document.body, (pick) => startRun(pick));
 
-  // 启动时进入主菜单。World 默认是 playing（纯逻辑层的默认值），
+  // 启动时回到标题画面。World 默认是 playing（纯逻辑层的默认值），
   // 这里显式切到 menu，避免开局就在后台跑逻辑。
   world.flow.toMenu();
-  menuUI.showMenu();
+  menuUI.show('title');
 
   // 这些 UI 模块会把元素动态插进 body，必须等它们创建完再定位一次，
   // 否则 syncLayout 找不到 #pile-bar 等节点（早期就是因此漏掉了按钮定位）。

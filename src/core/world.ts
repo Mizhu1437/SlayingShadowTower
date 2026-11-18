@@ -30,6 +30,11 @@ import { SpellSystem } from './spell/spellSystem';
 import { Deck, type CardPower } from './cards/deck';
 import type { CardDef } from './cards/def';
 import { createStarterDeck } from './cards/library';
+import {
+  DEFAULT_CHARACTER,
+  getCharacter,
+  type CharacterDef,
+} from './character';
 import { executeEffects, type EffectContext } from './cards/effects';
 import { WaveRunner } from './stage/waveRunner';
 import { generateStage } from './stage/generator';
@@ -42,6 +47,8 @@ export const FIELD_H = 448;
 
 export interface WorldConfig {
   seed: number;
+  /** 机体 id，省略则用默认机体 */
+  characterId?: string;
 }
 
 /**
@@ -137,7 +144,7 @@ interface SpawnRequest {
 }
 
 export class World {
-  readonly player: Player;
+  player: Player;
   /** 卡牌驱动的自机子弹（穿透弹 + 持续射击窗口） */
   readonly cardShots: CardShots;
   readonly enemyBullets: BulletField;
@@ -146,6 +153,9 @@ export class World {
 
   /** 自机是否处于低速等状态，供渲染层读 */
   input: InputState = { dx: 0, dy: 0, focus: false };
+
+  /** 当前机体 */
+  character: CharacterDef = DEFAULT_CHARACTER;
 
   /** 得分与金钱 */
   score = 0;
@@ -170,7 +180,7 @@ export class World {
   inBossSpell = false;
 
   /** 卡组（牌堆 + 能量 + 被动卡结算） */
-  readonly deck: Deck;
+  deck: Deck;
 
   /** 敌弹减速剩余时间与倍率（由卡牌效果设置） */
   private bulletSlowLeft = 0;
@@ -202,12 +212,33 @@ export class World {
   constructor(cfg: WorldConfig = { seed: 1 }) {
     this.seed = cfg.seed;
     this.rng = new Rng(cfg.seed);
-    this.player = new Player(FIELD_W / 2, FIELD_H * 0.82);
+    this.character = getCharacter(cfg.characterId ?? DEFAULT_CHARACTER.id);
+    this.player = new Player(FIELD_W / 2, FIELD_H * 0.82, this.character.player);
     this.cardShots = new CardShots(1024);
     this.enemyBullets = new BulletField(4096);
     this.shotGrid = new SpatialGrid(FIELD_W, FIELD_H, 32, 256);
     // 每局独立的 Rng 派生，保证洗牌顺序可复现且不影响波次生成
-    this.deck = new Deck(new Rng(derive(cfg.seed, 'cards')), createStarterDeck());
+    this.deck = new Deck(
+      new Rng(derive(cfg.seed, 'cards')),
+      this.character.deck.length > 0
+        ? this.character.deck.map((c) => ({ ...c }))
+        : createStarterDeck(),
+    );
+  }
+
+  /**
+   * 换机体并重建自机与初始卡组。
+   *
+   * 只能在开局前调用 —— 中途换机会让已经买的卡与
+   * 当前卡组失去一致性，那属于另一个功能（换装/变身）。
+   */
+  setCharacter(id: string): void {
+    this.character = getCharacter(id);
+    this.player = new Player(FIELD_W / 2, FIELD_H * 0.82, this.character.player);
+    this.deck = new Deck(
+      new Rng(derive(this.seed, 'cards')),
+      this.character.deck.map((c) => ({ ...c })),
+    );
   }
 
   get bounds() {
@@ -1357,8 +1388,15 @@ export class World {
     return this.flow.phase;
   }
 
+  /**
+   * 重置为一局全新的游戏。
+   *
+   * 关键：**必须重建卡组**，不能只清空计数。
+   * 否则上一局在商店买到的卡、装上的被动会带到新一局，
+   * 玩家点"再来一局"却发现卡组已经被上一局污染了。
+   */
   reset(): void {
-    this.player.reset(FIELD_W / 2, FIELD_H * 0.82);
+    this.player = new Player(FIELD_W / 2, FIELD_H * 0.82, this.character.player);
     this.cardShots.clear();
     this.enemyBullets.clear();
     this.coinDrops.length = 0;
@@ -1368,6 +1406,15 @@ export class World {
     this.coins = 0;
     this.kills = 0;
     this.elapsed = 0;
+    this.actsCleared = 0;
+    this.currentAct = 0;
+
+    // 卡组回到该机体的初始配置（清掉上一局买的卡与被动）
+    this.deck = new Deck(
+      new Rng(derive(this.seed, 'cards')),
+      this.character.deck.map((c) => ({ ...c })),
+    );
+
     this.flow.reset();
   }
 }
