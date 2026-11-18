@@ -67,6 +67,10 @@ SPEC["ui/title_bg.png"] = (1920, 1080, False)
 # 机体立绘
 SPEC["chara/chara_mokou.png"] = (600, 900, True)
 
+# 敌人立绘（战斗前对话用）
+SPEC["enemy/enemy_chiyi.png"] = (700, 1000, True)
+SPEC["enemy/enemy_beizi.png"] = (700, 1000, True)
+
 # 纵向无缝检查的目标（只有这些需要能上下拼接）
 SEAMLESS = [
     f"stages/act{a}_{layer}.png"
