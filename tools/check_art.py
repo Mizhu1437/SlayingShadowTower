@@ -28,6 +28,14 @@ except ImportError:
     sys.exit(2)
 
 
+# Windows 控制台默认 GBK，中文报告会变成乱码。强制切到 UTF-8。
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # ── 规格表：相对路径 → (宽, 高, 是否需要 alpha) ──
 
 STAGES_W, STAGES_H = 384, 768
@@ -53,13 +61,6 @@ for _act in range(1, 5):
 
 # 战斗像素绘（自机 + 7 种敌人）
 SPEC["pixel/pixel_player.png"] = (48, 48, True)
-SPEC["pixel/pixel_grunt.png"] = (32, 32, True)
-SPEC["pixel/pixel_fan.png"] = (40, 40, True)
-SPEC["pixel/pixel_ring.png"] = (48, 48, True)
-SPEC["pixel/pixel_elite_spiral.png"] = (56, 56, True)
-SPEC["pixel/pixel_elite_burst.png"] = (60, 60, True)
-SPEC["pixel/pixel_midboss.png"] = (80, 80, True)
-SPEC["pixel/pixel_boss.png"] = (96, 96, True)
 
 # 标题背景
 SPEC["ui/title_bg.png"] = (1920, 1080, False)
